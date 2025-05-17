@@ -1,6 +1,7 @@
-export default class PhaserLogo extends Phaser.Physics.Arcade.Sprite {
+export default class Sprite extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y) {
-    super(scene, x, y, 'phaser-logo')
+    super(scene, x, y, 'sprite')
+    /*
     scene.add.existing(this)
     scene.physics.add.existing(this)
 
@@ -10,5 +11,6 @@ export default class PhaserLogo extends Phaser.Physics.Arcade.Sprite {
       .on('pointerdown', () => {
         this.setVelocityY(-400)
       })
+    */
   }
 }
