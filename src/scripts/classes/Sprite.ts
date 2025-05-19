@@ -3,7 +3,7 @@ export default class Sprite extends Phaser.GameObjects.Sprite {
         super(scene, x, y, texture, frame);
         scene.add.existing(this);
         if (interactive) {
-            this.setInteractive();
+            this.setInteractive({ cursor: "pointer" });
         }
     }
 }
