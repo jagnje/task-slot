@@ -24,12 +24,20 @@
     <link rel="shortcut icon" href="./favicon.ico" type="image/x-icon" />
 
     <title><%= htmlWebpackPlugin.options.gameName %></title>
+
+    <link rel="preload" as="font" href="./assets/font/PermanentMarker-Regular.ttf" type="font/ttf" />
     <style>
       html,
       body {
         height: 100%;
         margin: 0;
         background-color: #000000;
+      }
+      @font-face {
+        font-family: PermanentMarker;
+        src: url('./assets/font/PermanentMarker-Regular.ttf');
+        font-weight:400;
+        font-weight:normal;
       }
     </style>
 
@@ -45,6 +53,7 @@
     </script> -->
   </head>
   <body>
+    <div style="font-family: PermanentMarker; position:absolute; left:-1000px; visibility:hidden;">.</div>
     <div id="phaser-game"></div>
   </body>
 </html>
