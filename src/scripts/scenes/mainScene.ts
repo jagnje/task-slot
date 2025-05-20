@@ -2,11 +2,11 @@ import config from '../../config'
 import Button from '../classes/Button'
 import { GameObjects, Scene, Math } from 'phaser'
 import { convertColorToString, numberWithCommas } from '../functions'
-import { symbolsText, reelsSymbols, paytable, lines} from '../common'
+import { symbolsText, reelsSymbols, paytable, lines } from '../common'
 import { Reel } from '../types'
 
-const reelsDurationBase = 1600
-const reelsDurationGap = 700
+const reelsDurationBaseMs = 1600
+const reelsDurationGapMs = 700
 const symbolsLength = symbolsText.length
 const reelsLength = 3
 const visibleSymbolsLength = 3
@@ -16,7 +16,7 @@ const whiteColor = 0xffffff
 const neonYellowColor = 0xfffa00
 const neonBlueColor = 0x057dff
 const linesColorPalette = [0xff8800, 0xffcc00, 0xb6ff00, 0xffa5, 0x00ddff]
-// const neonGreenColor = 0x00ff2e
+const neonGreenColor = 0x00ff2e
 const violetColor = 0x220044
 const reelWidth = 180
 const frameWidth = 10
@@ -36,7 +36,7 @@ function getScreenSymbols(reel: number, newPosition: number): number[] {
 }
 
 function getLineSymbols(reel: Reel[], linesSymbols: number[]): number[] {
-  const symbols = new Array(linesSymbols.length);
+  const symbols = new Array(linesSymbols.length)
   for (let i = 0; i < linesSymbols.length; i++) {
     symbols[i] = reel[i].currentScreenSymbol[linesSymbols[i]]
   }
@@ -46,9 +46,9 @@ function getLineSymbols(reel: Reel[], linesSymbols: number[]): number[] {
 function getWin(reel: Reel[], linesLength: number): number {
   let win = 0
 
-  for (let i = 0; i < linesLength; i++) { 
+  for (let i = 0; i < linesLength; i++) {
     const line = getLineSymbols(reel, lines[i])
-    let leadingSymbolsInLine = 1;
+    let leadingSymbolsInLine = 1
     const leadingSymbol = line[0]
     for (let j = 1; j < line.length; j++) {
       if (line[j] === leadingSymbol) {
@@ -77,6 +77,11 @@ export default class MainScene extends Scene {
   // ui elements
   topContainer: GameObjects.Container
   bottomContainer: GameObjects.Container
+  betWinContainer: GameObjects.Container
+  bet: GameObjects.Text
+  betText: GameObjects.Text
+  win: GameObjects.Text
+  winText: GameObjects.Text
 
   // buttons
   spin: Button
@@ -111,6 +116,7 @@ export default class MainScene extends Scene {
   balance: number = initialBalance
   isAutospinEnabled: boolean = false
   topContainerHeight: number
+  winAmount = 0
 
   constructor() {
     super({ key: 'MainScene' })
@@ -186,19 +192,21 @@ export default class MainScene extends Scene {
     */
 
     this.topContainerHeight = this.centerSlotY - yOffset - frameWidth / 2
-    const bottomContainerHeight = this.height - this.topContainerHeight - outerHeight - frameWidth * 2
+    const bottomContainerHeight = this.height - this.topContainerHeight - outerHeight - frameWidth * 5
 
     // containers
-  
+
     // top container
     this.topContainer = new GameObjects.Container(this, this.centerSlotX, this.topContainerHeight / 2 - frameWidth / 2)
 
     this.topContainer.add(
-      this.add.text(-outerWidth / 2, 0, 'FRUIT SLOT', {
-        color: convertColorToString(neonYellowColor),
-        fontSize: '65px',
-        fontFamily: 'PermanentMarker'
-      }).setOrigin(0, 0.5)
+      this.add
+        .text(-outerWidth / 2, 0, 'FRUIT SLOT', {
+          color: convertColorToString(neonYellowColor),
+          fontSize: '65px',
+          fontFamily: 'PermanentMarker'
+        })
+        .setOrigin(0, 0.5)
     )
 
     this.topContainer.add(
@@ -223,11 +231,24 @@ export default class MainScene extends Scene {
 
     this.add.existing(this.topContainer)
 
+    this.spin = new Button(this, 0, 0, 'spinButton', this.spinScale, undefined, () => this.startSpin(this))
+
+    this.betWinContainer = new GameObjects.Container(this, this.centerSlotX, this.height - bottomContainerHeight / 0.95)
+    this.bet = this.add
+      .text(-outerWidth / 2, 0, 'BET', {
+        color: convertColorToString(neonYellowColor),
+        fontSize: '26px',
+        fontFamily: 'PermanentMarker'
+      })
+      .setOrigin(0, 0.5)
+
+    this.betText = this.getBetText()
+    this.betWinContainer.add([this.bet, this.betText])
+    this.add.existing(this.betWinContainer)
+
     this.bottomContainer = new GameObjects.Container(this, this.centerSlotX, this.height - bottomContainerHeight / 2)
 
     // buttons
-
-    this.spin = new Button(this, 0, 0, 'spinButton', this.spinScale, undefined, () => this.startSpin(this))
 
     this.maxbet = new Button(
       this,
@@ -258,27 +279,10 @@ export default class MainScene extends Scene {
       undefined,
       () => this.showMenu()
     )
-    const linesText = this.add
-      .text(-outerWidth / 2, this.bottomContainer.height / 2 - (this.spin.height / 2) * this.spinScale, 'LINES', {
-        color: convertColorToString(whiteColor),
-        fontSize: '26px',
-        fontFamily: 'PermanentMarker'
-      })
-      .setOrigin(0, 0)
-
-    this.plusLines = new Button(
-      this,
-      -outerWidth / 2,
-      this.bottomContainer.height / 2 - (this.spin.height / 3.5) * this.spinScale,
-      'plusMinusAtlas',
-      this.smallestScale,
-      'plus.png',
-      () => this.changeLines(true)
-    ).setOrigin(0, 0)
 
     this.minusLines = new Button(
       this,
-      -outerWidth / 2 + this.plusLines.width * this.smallestScale,
+      -outerWidth / 2,
       this.bottomContainer.height / 2 - (this.spin.height / 3.5) * this.spinScale,
       'plusMinusAtlas',
       this.smallestScale,
@@ -286,27 +290,19 @@ export default class MainScene extends Scene {
       () => this.changeLines()
     ).setOrigin(0, 0)
 
-    const coinsText = this.add
-      .text(-outerWidth / 2, -(this.bottomContainer.height / 2 - (this.spin.height / 2) * this.spinScale), 'COINS', {
-        color: convertColorToString(whiteColor),
-        fontSize: '26px',
-        fontFamily: 'PermanentMarker'
-      })
-      .setOrigin(0, 1)
-
-    this.plusCoins = new Button(
+    this.plusLines = new Button(
       this,
-      -outerWidth / 2,
-      -(this.bottomContainer.height / 2 - (this.spin.height / 3.5) * this.spinScale),
+      -outerWidth / 2 + this.minusLines.width * this.smallestScale * 1.1,
+      this.bottomContainer.height / 2 - (this.spin.height / 3.5) * this.spinScale,
       'plusMinusAtlas',
       this.smallestScale,
       'plus.png',
-      () => this.changeCoins(true)
-    ).setOrigin(0, 1)
+      () => this.changeLines(true)
+    ).setOrigin(0, 0)
 
     this.minusCoins = new Button(
       this,
-      -outerWidth / 2 + this.plusLines.width * this.smallestScale,
+      -outerWidth / 2,
       -(this.bottomContainer.height / 2 - (this.spin.height / 3.5) * this.spinScale),
       'plusMinusAtlas',
       this.smallestScale,
@@ -314,8 +310,34 @@ export default class MainScene extends Scene {
       () => this.changeCoins()
     ).setOrigin(0, 1)
 
-    this.linesText = this.newLinesText()
-    this.coinsText = this.newCoinsText()
+    this.plusCoins = new Button(
+      this,
+      -outerWidth / 2 + this.minusLines.width * this.smallestScale * 1.1,
+      -(this.bottomContainer.height / 2 - (this.spin.height / 3.5) * this.spinScale),
+      'plusMinusAtlas',
+      this.smallestScale,
+      'plus.png',
+      () => this.changeCoins(true)
+    ).setOrigin(0, 1)
+
+    const linesText = this.add
+      .text(-outerWidth / 2, this.bottomContainer.height / 2 - this.spin.height / 2 * this.spinScale, 'LINES', {
+        color: convertColorToString(whiteColor),
+        fontSize: '26px',
+        fontFamily: 'PermanentMarker'
+      })
+      .setOrigin(0, 0)
+
+    const coinsText = this.add
+      .text(-outerWidth / 2, -(this.bottomContainer.height / 2 - this.spin.height / 2 * this.spinScale), 'COINS', {
+        color: convertColorToString(whiteColor),
+        fontSize: '26px',
+        fontFamily: 'PermanentMarker'
+      })
+      .setOrigin(0, 1)
+
+    this.linesText = this.getLinesText()
+    this.coinsText = this.getCoinsText()
 
     this.bottomContainer.add([
       this.spin,
@@ -345,7 +367,7 @@ export default class MainScene extends Scene {
           symbolSize * visibleSymbolsLength,
           `reel${i + 1}`
         ),
-        duration: reelsDurationBase + i * reelsDurationGap,
+        duration: reelsDurationBaseMs + i * reelsDurationGapMs,
         currentScreenSymbol: new Array(visibleSymbolsLength).fill(null)
       }
     }
@@ -357,7 +379,15 @@ export default class MainScene extends Scene {
     const menuContainer = new GameObjects.Container(this, this.centerSlotX, this.height - menuContainerHeight / 2)
     const rectangle = new GameObjects.Rectangle(this, 0, 0, this.width, menuContainerHeight, violetColor)
 
-    this.back = new Button(this, this.width/2 - this.info.height/2 * this.smallScale, -menuContainerHeight/2 + this.info.height/2 * this.smallScale, 'backButton', 0.5, undefined, () => this.hideMenu())
+    this.back = new Button(
+      this,
+      this.width / 2 - (this.info.height / 2) * this.smallScale,
+      -menuContainerHeight / 2 + (this.info.height / 2) * this.smallScale,
+      'backButton',
+      0.5,
+      undefined,
+      () => this.hideMenu()
+    )
     const topRectangles = new Array(symbolsLength)
     const topRectanglesInner = new Array(symbolsLength)
     const bottomRectangles = new Array(symbolsLength)
@@ -368,101 +398,134 @@ export default class MainScene extends Scene {
     const symbolsTextBottomLeft = new Array(symbolsLength)
     const symbolsTextBottomRight = new Array(symbolsLength)
 
-    const paytableText = this.add.text(0, -this.height/2.5, 'PAY TABLE', {
+    const paytableText = this.add
+      .text(0, -this.height / 2.5, 'PAY TABLE', {
         color: convertColorToString(neonBlueColor),
         fontSize: '50px',
         fontFamily: 'PermanentMarker'
-      }).setOrigin(0.5, 0.5)
+      })
+      .setOrigin(0.5, 0.5)
 
-    const linesText = this.add.text(0, this.height/9, 'LINES', {
+    const linesText = this.add
+      .text(0, this.height / 9, 'LINES', {
         color: convertColorToString(neonBlueColor),
         fontSize: '40px',
         fontFamily: 'PermanentMarker'
-      }).setOrigin(0.5, 0.5)
+      })
+      .setOrigin(0.5, 0.5)
 
     const linesTextTop = new Array(symbolsLength)
 
     const linesRectangles: GameObjects.Rectangle[] = [] // new Array(symbolsLength * visibleSymbolsLength * reelsLength)
-    const size = this.height / 21;
+    const size = this.height / 21
     for (let i = 0; i < symbolsLength; i++) {
       for (let j = 0; j < reelsLength; j++) {
-        const x = (i - 2) * this.width / 5 + (j-1) * 40
+        const x = ((i - 2) * this.width) / 5 + (j - 1) * 40
         for (let k = 0; k < visibleSymbolsLength; k++) {
-          const y = this.height/3.8 + k * 40
-          linesRectangles.push(new GameObjects.Rectangle (this, x, y, size, size, lines[i][j] === k ? linesColorPalette[i] : whiteColor))
+          const y = this.height / 3.8 + k * 40
+          linesRectangles.push(
+            new GameObjects.Rectangle(this, x, y, size, size, lines[i][j] === k ? linesColorPalette[i] : whiteColor)
+          )
         }
       }
 
-      linesTextTop[i] = this.add.text((i - 2) * this.width / 5, + this.height / 5, `Line ${i+1}`, {
-        color: convertColorToString(neonYellowColor),
-        fontSize: '40px',
-        fontFamily: 'PermanentMarker'
-      }).setOrigin(0.5, 0.5)
+      linesTextTop[i] = this.add
+        .text(((i - 2) * this.width) / 5, +this.height / 5, `Line ${i + 1}`, {
+          color: convertColorToString(neonYellowColor),
+          fontSize: '40px',
+          fontFamily: 'PermanentMarker'
+        })
+        .setOrigin(0.5, 0.5)
 
       topRectangles[i] = new GameObjects.Rectangle(
         this,
-        (i - 2) * this.width / 5,
-        - this.height / 7,
+        ((i - 2) * this.width) / 5,
+        -this.height / 7,
         this.width / 6,
         this.height / 2.8,
         neonBlueColor
       )
-      
+
       topRectanglesInner[i] = new GameObjects.Rectangle(
         this,
-        (i - 2) * this.width / 5,
-        - this.height / 7,
+        ((i - 2) * this.width) / 5,
+        -this.height / 7,
         this.width / 6 - 10,
         this.height / 2.8 - 10,
         violetColor
       )
 
-      symbols[i] = this.add.image((i - 2) * this.width / 5, - this.height / 4.5, 'symbolsAtlas', `s${i + 1}.png`)
-      symbolsTextTopLeft[i] = this.add.text((i - 2) * this.width / 5 - (this.width / 12)/2, - this.height / 9, '3:', {
-        color: convertColorToString(neonYellowColor),
-        fontSize: '50px',
-        fontFamily: 'PermanentMarker'
-      }).setOrigin(0.5, 0.5)
+      symbols[i] = this.add.image(((i - 2) * this.width) / 5, -this.height / 4.5, 'symbolsAtlas', `s${i + 1}.png`)
+      symbolsTextTopLeft[i] = this.add
+        .text(((i - 2) * this.width) / 5 - this.width / 12 / 2, -this.height / 9, '3:', {
+          color: convertColorToString(neonYellowColor),
+          fontSize: '50px',
+          fontFamily: 'PermanentMarker'
+        })
+        .setOrigin(0.5, 0.5)
 
-      symbolsTextTopRight[i] = this.add.text((i - 2) * this.width / 5 + (this.width / 14)/2, - this.height / 9, paytable[i][2].toString(), {
-        color: convertColorToString(whiteColor),
-        fontSize: '50px',
-        fontFamily: 'PermanentMarker'
-      }).setOrigin(0.5, 0.5)
+      symbolsTextTopRight[i] = this.add
+        .text(((i - 2) * this.width) / 5 + this.width / 14 / 2, -this.height / 9, paytable[i][2].toString(), {
+          color: convertColorToString(whiteColor),
+          fontSize: '50px',
+          fontFamily: 'PermanentMarker'
+        })
+        .setOrigin(0.5, 0.5)
 
-      symbolsTextBottomLeft[i] = this.add.text((i - 2) * this.width / 5 - (this.width / 12)/2, - this.height / 30, '2:', {
-        color: convertColorToString(neonYellowColor),
-        fontSize: '50px',
-        fontFamily: 'PermanentMarker'
-      }).setOrigin(0.5, 0.5)
+      symbolsTextBottomLeft[i] = this.add
+        .text(((i - 2) * this.width) / 5 - this.width / 12 / 2, -this.height / 30, '2:', {
+          color: convertColorToString(neonYellowColor),
+          fontSize: '50px',
+          fontFamily: 'PermanentMarker'
+        })
+        .setOrigin(0.5, 0.5)
 
-      symbolsTextBottomRight[i] = this.add.text((i - 2) * this.width / 5 + (this.width / 14)/2, - this.height / 30, paytable[i][1].toString(), {
-        color: convertColorToString(whiteColor),
-        fontSize: '50px',
-        fontFamily: 'PermanentMarker'
-      }).setOrigin(0.5, 0.5)
+      symbolsTextBottomRight[i] = this.add
+        .text(((i - 2) * this.width) / 5 + this.width / 14 / 2, -this.height / 30, paytable[i][1].toString(), {
+          color: convertColorToString(whiteColor),
+          fontSize: '50px',
+          fontFamily: 'PermanentMarker'
+        })
+        .setOrigin(0.5, 0.5)
 
       bottomRectangles[i] = new GameObjects.Rectangle(
         this,
-        (i - 2) * this.width / 5,
-        + this.height / 3.5,
+        ((i - 2) * this.width) / 5,
+        +this.height / 3.5,
         this.width / 6,
         this.height / 4,
         neonBlueColor
       )
-      
+
       bottomRectanglesInner[i] = new GameObjects.Rectangle(
         this,
-        (i - 2) * this.width / 5,
-        + this.height / 3.5,
+        ((i - 2) * this.width) / 5,
+        +this.height / 3.5,
         this.width / 6 - 10,
         this.height / 4 - 10,
         violetColor
       )
     }
 
-    menuContainer.add([rectangle, this.back, ...topRectangles, ...topRectanglesInner, paytableText, linesText, ...bottomRectangles, ...bottomRectanglesInner, ...linesRectangles])
-    menuContainer.add([...symbols, ...symbolsTextTopLeft, ...symbolsTextTopRight, ...symbolsTextBottomLeft, ...symbolsTextBottomRight, ...linesTextTop])
+    menuContainer.add([
+      rectangle,
+      this.back,
+      ...topRectangles,
+      ...topRectanglesInner,
+      paytableText,
+      linesText,
+      ...bottomRectangles,
+      ...bottomRectanglesInner,
+      ...linesRectangles
+    ])
+    menuContainer.add([
+      ...symbols,
+      ...symbolsTextTopLeft,
+      ...symbolsTextTopRight,
+      ...symbolsTextBottomLeft,
+      ...symbolsTextBottomRight,
+      ...linesTextTop
+    ])
     return menuContainer
   }
 
@@ -520,8 +583,9 @@ export default class MainScene extends Scene {
       ? linesOptions.length - 1
       : this.getNewPosition(this.linesPosition, linesOptions, forward)
     this.bottomContainer.remove(this.linesText, true)
-    this.linesText = this.newLinesText()
+    this.linesText = this.getLinesText()
     this.bottomContainer.add(this.linesText)
+    this.changeBet()
   }
 
   changeCoins(forward?: boolean, maxBet?: boolean) {
@@ -529,13 +593,20 @@ export default class MainScene extends Scene {
       ? coinsOptions.length - 1
       : this.getNewPosition(this.coinsPosition, coinsOptions, forward)
     this.bottomContainer.remove(this.coinsText, true)
-    this.coinsText = this.newCoinsText()
+    this.coinsText = this.getCoinsText()
     this.bottomContainer.add(this.coinsText)
+    this.changeBet()
   }
 
-  newLinesText(): GameObjects.Text {
+  changeBet() {
+    this.betWinContainer.remove(this.betText, true)
+    this.betText = this.getBetText()
+    this.betWinContainer.add(this.betText)
+  }
+
+  getLinesText(): GameObjects.Text {
     return this.add
-      .text(-this.spin.width, (-this.spin.width * this.spinScale) / 4, linesOptions[this.linesPosition].toString(), {
+      .text(-this.spin.width, - this.spin.height / 3 * this.spinScale, linesOptions[this.linesPosition].toString(), {
         color: convertColorToString(whiteColor),
         fontSize: '50px',
         fontFamily: 'PermanentMarker'
@@ -543,15 +614,35 @@ export default class MainScene extends Scene {
       .setOrigin(0.5, 0.5)
   }
 
-  newCoinsText(): GameObjects.Text {
+  getCoinsText(): GameObjects.Text {
     return this.add
-      .text(-this.spin.width, (+this.spin.width * this.spinScale) / 4, coinsOptions[this.coinsPosition].toString(), {
+      .text(-this.spin.width, + this.spin.height / 4 * this.spinScale, coinsOptions[this.coinsPosition].toString(), {
         color: convertColorToString(whiteColor),
         fontSize: '50px',
         fontFamily: 'PermanentMarker'
       })
       .setOrigin(0.5, 0.5)
   }
+
+  getBetText(): GameObjects.Text {
+    return this.add
+      .text(-this.spin.width, 0, (linesOptions[this.linesPosition] * coinsOptions[this.coinsPosition]).toString(), {
+        color: convertColorToString(neonYellowColor),
+        fontSize: '40px',
+        fontFamily: 'PermanentMarker'
+      })
+      .setOrigin(0.5, 0.5)
+  }
+
+  getWinText(win: number): GameObjects.Text {
+    return this.add
+      .text(this.spin.width, 0, (win).toString(), {
+        color: convertColorToString(neonGreenColor),
+        fontSize: '40px',
+        fontFamily: 'PermanentMarker'
+      })
+      .setOrigin(0.5, 0.5)
+  }  
   /*
   addLemonsAndShow(container: GameObjects.Container) {
     container.add(new Sprite(this, 0, 0, 'lemon', '', true).setOrigin(0, 0).setScale(0.3))
@@ -581,9 +672,15 @@ export default class MainScene extends Scene {
           this.reels[i].reel.tilePositionY = tilePositionY
 
           if (i === reelsLength - 1) {
+            if (this.winAmount > 0) {
+              this.winText = this.getWinText(this.winAmount)
+              this.win = this.getWin()
+              this.betWinContainer.add([this.win, this.winText])
+            }
+
             if (this.isAutospinEnabled) {
               this.time.addEvent({
-                delay: autospinDelayBetweenSpinsMs,
+                delay: reelsDurationBaseMs + (reelsLength - 1) * reelsDurationGapMs,
                 callback: () => this.startSpin(this),
                 callbackScope: this
               })
@@ -605,12 +702,28 @@ export default class MainScene extends Scene {
       }
     }
     if (!initialize) {
-      const win = getWin(this.reels, linesOptions[this.linesPosition])
-      console.log('bare win', win)
-      if (win > 0) {
-        console.log('calculated win', win * coinsOptions[this.coinsPosition])
+      if (this.win) {
+        this.betWinContainer.remove(this.win, true)
+      }
+      if (this.winText) {
+        this.betWinContainer.remove(this.winText, true)
+      }
+
+      this.winAmount = getWin(this.reels, linesOptions[this.linesPosition])
+      if (this.winAmount) {
+        this.winAmount *= coinsOptions[this.coinsPosition]
       }
     }
+  }
+
+  getWin() {
+    return this.add
+      .text(0, 0, 'WIN', {
+        color: convertColorToString(neonGreenColor),
+        fontSize: '26px',
+        fontFamily: 'PermanentMarker'
+      })
+      .setOrigin(0.5, 0.5)
   }
 
   blurReels() {
