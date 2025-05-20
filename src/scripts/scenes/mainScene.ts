@@ -1,60 +1,116 @@
-import Sprite from '../classes/Sprite'
 import config from '../../config'
 import Button from '../classes/Button'
 import { GameObjects, Scene, Math } from 'phaser'
 import { convertColorToString, numberWithCommas } from '../functions'
-import { symbolsText, reelsSymbols } from '../common'
-import { Reel, Symbol } from '../types'
+import { symbolsText, reelsSymbols, paytable, lines} from '../common'
+import { Reel } from '../types'
 
 const reelsDurationBase = 1600
 const reelsDurationGap = 700
 const symbolsLength = symbolsText.length
 const reelsLength = 3
-const visibleSymbols = 3
+const visibleSymbolsLength = 3
 const symbolSize = 138
-const reelsSymbolsLength = reelsSymbols[0].length
+const reelSymbolsLength = reelsSymbols[0].length
 const whiteColor = 0xffffff
 const neonYellowColor = 0xfffa00
+const neonBlueColor = 0x057dff
+const linesColorPalette = [0xff8800, 0xffcc00, 0xb6ff00, 0xffa5, 0x00ddff]
+// const neonGreenColor = 0x00ff2e
 const violetColor = 0x220044
-const centerSlotY = 300
-const centerSlotX = 1080 / 2
 const reelWidth = 180
-const rectangleWidth = 10
-const rectangleWidthNarrow = 5
+const frameWidth = 10
+const frameWidthNarrow = 6
 const initialBalance = 100000
 const coinsOptions = [1, 2, 5, 10, 20, 50, 100]
 const linesOptions = [1, 2, 3, 4, 5]
-const autospinDelayMs = 1000;
+const autospinDelayBetweenSpinsMs = 1000
 
 function getScreenSymbols(reel: number, newPosition: number): number[] {
-  const prevPosition = newPosition === 0 ? reelsSymbolsLength - 1 : newPosition - 1
-  const nextPosition = newPosition === reelsSymbolsLength - 1 ? 0 : newPosition + 1
+  const prevPosition = newPosition === 0 ? reelSymbolsLength - 1 : newPosition - 1
+  const nextPosition = newPosition === reelSymbolsLength - 1 ? 0 : newPosition + 1
   const reelSymbolPrev = reelsSymbols[reel][prevPosition]
   const reelSymbol = reelsSymbols[reel][newPosition]
   const reelSymbolNext = reelsSymbols[reel][nextPosition]
-  console.log(reel, symbolsText[reelSymbolPrev - 1], symbolsText[reelSymbol - 1], symbolsText[reelSymbolNext - 1])
   return [reelSymbolPrev, reelSymbol, reelSymbolNext]
 }
 
+function getLineSymbols(reel: Reel[], linesSymbols: number[]): number[] {
+  const symbols = new Array(linesSymbols.length);
+  for (let i = 0; i < linesSymbols.length; i++) {
+    symbols[i] = reel[i].currentScreenSymbol[linesSymbols[i]]
+  }
+  return symbols
+}
+
+function getWin(reel: Reel[], linesLength: number): number {
+  let win = 0
+
+  for (let i = 0; i < linesLength; i++) { 
+    const line = getLineSymbols(reel, lines[i])
+    let leadingSymbolsInLine = 1;
+    const leadingSymbol = line[0]
+    for (let j = 1; j < line.length; j++) {
+      if (line[j] === leadingSymbol) {
+        leadingSymbolsInLine = j + 1
+      } else {
+        break
+      }
+    }
+
+    const lineWin = paytable[leadingSymbol - 1][leadingSymbolsInLine - 1]
+    if (lineWin > 0) {
+      win += lineWin
+    }
+  }
+
+  return win
+}
+
 export default class MainScene extends Scene {
-  linesPosition: number
-  coinsPosition: number
-  info: Button
+  // dimensions
+  width = config.scale.width
+  height = config.scale.height
+  centerSlotY = this.height / 2 - symbolSize / 2
+  centerSlotX = this.width / 2
+
+  // ui elements
+  topContainer: GameObjects.Container
+  bottomContainer: GameObjects.Container
+
+  // buttons
   spin: Button
+  // right of spin
+  info: Button
   maxbet: Button
   autospin: Button
-  stop: Button|null
+  stop: Button
+  // left of spin
+  // lines
   plusLines: Button
   minusLines: Button
+  linesText: GameObjects.Text
+  // coins
   plusCoins: Button
   minusCoins: Button
-  linesText: GameObjects.Text
   coinsText: GameObjects.Text
-  balance: number
+  // reel
   reels: Reel[]
-  symbols: Symbol[]
-  currentScreenSymbols: number[][]
-  autospinValue: boolean
+  // menu
+  menuContainer: GameObjects.Container
+  back: Button
+
+  // scaling
+  spinScale = 1.3
+  smallScale = this.spinScale / 2
+  smallestScale = this.smallScale / 2
+
+  // variables
+  linesPosition: number = 0
+  coinsPosition: number = 0
+  balance: number = initialBalance
+  isAutospinEnabled: boolean = false
+  topContainerHeight: number
 
   constructor() {
     super({ key: 'MainScene' })
@@ -80,28 +136,46 @@ export default class MainScene extends Scene {
   }
 
   create() {
-    // this.back = new Button(this, config.scale.width / 2 + 220, config.scale.height - 142, 'backButton', 0.6, undefined, () =>this.closeMenu())
-    this.balance = initialBalance
-    this.autospinValue = false
-    this.linesPosition = 0
-    this.coinsPosition = 0
-    this.currentScreenSymbols = new Array(reelsLength)
-    for (let i = 0; i < this.currentScreenSymbols.length; i++) {
-      this.currentScreenSymbols[i] = new Array(visibleSymbols)
+    this.add.image(this.centerSlotX, this.height / 2, 'bg')
+
+    // frame variables
+    const outerWidth = reelWidth * reelsLength + frameWidth
+    const outerHeight = symbolSize * reelsLength
+    const yOffset = (reelsLength * symbolSize) / 2 + frameWidth / 2
+    const xOffset = (reelsLength * reelWidth) / 2
+
+    // frame
+    this.add.rectangle(this.centerSlotX, this.centerSlotY - yOffset, outerWidth, frameWidth, neonYellowColor)
+    this.add.rectangle(this.centerSlotX, this.centerSlotY + yOffset, outerWidth, frameWidth, neonYellowColor)
+    this.add.rectangle(this.centerSlotX - xOffset, this.centerSlotY, frameWidth, outerHeight, neonYellowColor)
+    this.add.rectangle(this.centerSlotX + xOffset, this.centerSlotY, frameWidth, outerHeight, neonYellowColor)
+
+    // frame inner
+    this.add.rectangle(
+      this.centerSlotX - reelWidth / 2,
+      this.centerSlotY,
+      frameWidthNarrow,
+      outerHeight,
+      neonYellowColor
+    )
+    this.add.rectangle(
+      this.centerSlotX + reelWidth / 2,
+      this.centerSlotY,
+      frameWidthNarrow,
+      outerHeight,
+      neonYellowColor
+    )
+
+    // reels backgrounds
+    for (let i = 0; i < reelsLength; i++) {
+      this.add.rectangle(
+        this.centerSlotX + (i - 1) * reelWidth,
+        this.centerSlotY,
+        reelWidth - frameWidthNarrow,
+        symbolSize * visibleSymbolsLength,
+        violetColor
+      )
     }
-
-    this.add.image(config.scale.width / 2, config.scale.height / 2, 'bg')
-    this.add.rectangle(config.scale.width / 2, 95, 550, rectangleWidth, neonYellowColor)
-    this.add.rectangle(config.scale.width / 2, 509, 550, rectangleWidth, neonYellowColor)
-    this.add.rectangle(config.scale.width / 2 - 270, 302, rectangleWidth, 405, neonYellowColor)
-    this.add.rectangle(config.scale.width / 2 + 270, 302, rectangleWidth, 405, neonYellowColor)
-
-    this.add.rectangle(config.scale.width / 2 - 90, 302, rectangleWidthNarrow, 405, neonYellowColor)
-    this.add.rectangle(config.scale.width / 2 + 90, 302, rectangleWidthNarrow, 405, neonYellowColor)
-
-    this.add.rectangle(config.scale.width / 2, 300, 175, 400, violetColor)
-    this.add.rectangle(config.scale.width / 2 - 179, 300, 173, 400, violetColor)
-    this.add.rectangle(config.scale.width / 2 + 179, 300, 173, 400, violetColor)
 
     /*
     this.containerTopLeft = new GameObjects.Container(this,280,25);
@@ -111,127 +185,306 @@ export default class MainScene extends Scene {
     this.addLemonsAndShow(this.containerTopRight);
     */
 
-    this.add
-      .text(265, 5, 'FRUIT SLOT', {
+    this.topContainerHeight = this.centerSlotY - yOffset - frameWidth / 2
+    const bottomContainerHeight = this.height - this.topContainerHeight - outerHeight - frameWidth * 2
+
+    // containers
+  
+    // top container
+    this.topContainer = new GameObjects.Container(this, this.centerSlotX, this.topContainerHeight / 2 - frameWidth / 2)
+
+    this.topContainer.add(
+      this.add.text(-outerWidth / 2, 0, 'FRUIT SLOT', {
         color: convertColorToString(neonYellowColor),
         fontSize: '65px',
         fontFamily: 'PermanentMarker'
-      })
-      .setOrigin(0, 0)
-
-    this.add
-      .text(815, 14, 'BALANCE', {
-        color: convertColorToString(whiteColor),
-        fontSize: '26px',
-        fontFamily: 'PermanentMarker'
-      })
-      .setOrigin(1, 0)
-
-    this.add
-      .text(815, 42, `${numberWithCommas(this.balance)} $`, {
-        color: convertColorToString(whiteColor),
-        fontSize: '26px',
-        fontFamily: 'PermanentMarker'
-      })
-      .setOrigin(1, 0)
-
-    this.spin = new Button(this, config.scale.width / 2, config.scale.height - 100, 'spinButton', 1.3, undefined, () =>
-      this.startSpin(this)
+      }).setOrigin(0, 0.5)
     )
+
+    this.topContainer.add(
+      this.add
+        .text(outerWidth / 2, -15, 'BALANCE', {
+          color: convertColorToString(whiteColor),
+          fontSize: '26px',
+          fontFamily: 'PermanentMarker'
+        })
+        .setOrigin(1, 0.5)
+    )
+
+    this.topContainer.add(
+      this.add
+        .text(outerWidth / 2, 15, `${numberWithCommas(this.balance)} $`, {
+          color: convertColorToString(whiteColor),
+          fontSize: '26px',
+          fontFamily: 'PermanentMarker'
+        })
+        .setOrigin(1, 0.5)
+    )
+
+    this.add.existing(this.topContainer)
+
+    this.bottomContainer = new GameObjects.Container(this, this.centerSlotX, this.height - bottomContainerHeight / 2)
+
+    // buttons
+
+    this.spin = new Button(this, 0, 0, 'spinButton', this.spinScale, undefined, () => this.startSpin(this))
 
     this.maxbet = new Button(
       this,
-      config.scale.width / 2 + 140,
-      config.scale.height - 142,
+      this.spin.width * this.spinScale * 0.85,
+      (-this.spin.height * this.spinScale) / 4,
       'maxbetButton',
-      0.6,
+      this.smallScale,
       undefined,
       () => this.setMaxBet()
     )
+
     this.autospin = new Button(
       this,
-      config.scale.width / 2 + 140,
-      config.scale.height - 59,
+      this.spin.width * this.spinScale * 0.85,
+      (this.spin.height * this.spinScale) / 4,
       'autospinButton',
-      0.6,
+      this.smallScale,
       undefined,
-      () => this.setAutospinValue(true)
+      () => this.setIsAutospinEnabled(true)
     )
 
-    this.info = new Button(this, config.scale.width / 2 + 220, config.scale.height - 142, 'infoButton', 0.6, undefined, () =>this.showMenu())
-
-    this.add
-      .text(267, config.scale.height - 183, 'LINES', {
+    this.info = new Button(
+      this,
+      this.spin.width * this.spinScale * 1.4,
+      (-this.spin.height * this.spinScale) / 4,
+      'infoButton',
+      this.smallScale,
+      undefined,
+      () => this.showMenu()
+    )
+    const linesText = this.add
+      .text(-outerWidth / 2, this.bottomContainer.height / 2 - (this.spin.height / 2) * this.spinScale, 'LINES', {
         color: convertColorToString(whiteColor),
         fontSize: '26px',
         fontFamily: 'PermanentMarker'
       })
       .setOrigin(0, 0)
 
-    this.plusLines = new Button(this, 282, config.scale.height - 127, 'plusMinusAtlas', 0.3, 'plus.png', () =>
-      this.changeLines(true)
-    )
-    this.minusLines = new Button(this, 325, config.scale.height - 127, 'plusMinusAtlas', 0.3, 'minus.png', () =>
-      this.changeLines()
-    )
+    this.plusLines = new Button(
+      this,
+      -outerWidth / 2,
+      this.bottomContainer.height / 2 - (this.spin.height / 3.5) * this.spinScale,
+      'plusMinusAtlas',
+      this.smallestScale,
+      'plus.png',
+      () => this.changeLines(true)
+    ).setOrigin(0, 0)
+
+    this.minusLines = new Button(
+      this,
+      -outerWidth / 2 + this.plusLines.width * this.smallestScale,
+      this.bottomContainer.height / 2 - (this.spin.height / 3.5) * this.spinScale,
+      'plusMinusAtlas',
+      this.smallestScale,
+      'minus.png',
+      () => this.changeLines()
+    ).setOrigin(0, 0)
+
+    const coinsText = this.add
+      .text(-outerWidth / 2, -(this.bottomContainer.height / 2 - (this.spin.height / 2) * this.spinScale), 'COINS', {
+        color: convertColorToString(whiteColor),
+        fontSize: '26px',
+        fontFamily: 'PermanentMarker'
+      })
+      .setOrigin(0, 1)
+
+    this.plusCoins = new Button(
+      this,
+      -outerWidth / 2,
+      -(this.bottomContainer.height / 2 - (this.spin.height / 3.5) * this.spinScale),
+      'plusMinusAtlas',
+      this.smallestScale,
+      'plus.png',
+      () => this.changeCoins(true)
+    ).setOrigin(0, 1)
+
+    this.minusCoins = new Button(
+      this,
+      -outerWidth / 2 + this.plusLines.width * this.smallestScale,
+      -(this.bottomContainer.height / 2 - (this.spin.height / 3.5) * this.spinScale),
+      'plusMinusAtlas',
+      this.smallestScale,
+      'minus.png',
+      () => this.changeCoins()
+    ).setOrigin(0, 1)
+
     this.linesText = this.newLinesText()
-
-    this.add
-      .text(267, config.scale.height - 96, 'COINS', {
-        color: convertColorToString(whiteColor),
-        fontSize: '26px',
-        fontFamily: 'PermanentMarker'
-      })
-      .setOrigin(0, 0)
-
-    this.plusCoins = new Button(this, 282, config.scale.height - 40, 'plusMinusAtlas', 0.3, 'plus.png', () =>
-      this.changeCoins(true)
-    )
-    this.minusCoins = new Button(this, 325, config.scale.height - 40, 'plusMinusAtlas', 0.3, 'minus.png', () =>
-      this.changeCoins()
-    )
-
     this.coinsText = this.newCoinsText()
 
-    this.symbols = []
-    for (let i = 0; i < symbolsLength; i++) {
-      this.symbols.push({
-        symbol: new GameObjects.Image(
-          this,
-          config.scale.width - 200,
-          config.scale.height - 70,
-          'symbolsAtlas',
-          `s${i + 1}.png`
-        ),
-        text: symbolsText[i]
-      })
-    }
+    this.bottomContainer.add([
+      this.spin,
+      this.maxbet,
+      this.autospin,
+      this.info,
+      linesText,
+      this.plusLines,
+      this.minusLines,
+      this.linesText,
+      coinsText,
+      this.plusCoins,
+      this.minusCoins,
+      this.coinsText
+    ])
 
-    this.reels = []
-    for (let i = 0; i < reelsLength; i++) {
-      this.reels.push({
+    this.add.existing(this.bottomContainer)
+
+    // reels
+    this.reels = new Array(reelsLength)
+    for (let i = 0; i < this.reels.length; i++) {
+      this.reels[i] = {
         reel: this.add.tileSprite(
-          centerSlotX + (i - 1) * reelWidth,
-          centerSlotY,
+          this.centerSlotX + (i - 1) * reelWidth,
+          this.centerSlotY,
           symbolSize,
-          symbolSize * visibleSymbols,
+          symbolSize * visibleSymbolsLength,
           `reel${i + 1}`
         ),
-        duration: reelsDurationBase + i * reelsDurationGap
-      })
+        duration: reelsDurationBase + i * reelsDurationGap,
+        currentScreenSymbol: new Array(visibleSymbolsLength).fill(null)
+      }
     }
-
     this.shuffle(true)
   }
 
-  showMenu() {
+  createMenu(): GameObjects.Container {
+    const menuContainerHeight = this.height - this.topContainerHeight
+    const menuContainer = new GameObjects.Container(this, this.centerSlotX, this.height - menuContainerHeight / 2)
+    const rectangle = new GameObjects.Rectangle(this, 0, 0, this.width, menuContainerHeight, violetColor)
 
+    this.back = new Button(this, this.width/2 - this.info.height/2 * this.smallScale, -menuContainerHeight/2 + this.info.height/2 * this.smallScale, 'backButton', 0.5, undefined, () => this.hideMenu())
+    const topRectangles = new Array(symbolsLength)
+    const topRectanglesInner = new Array(symbolsLength)
+    const bottomRectangles = new Array(symbolsLength)
+    const bottomRectanglesInner = new Array(symbolsLength)
+    const symbols = new Array(symbolsLength)
+    const symbolsTextTopLeft = new Array(symbolsLength)
+    const symbolsTextTopRight = new Array(symbolsLength)
+    const symbolsTextBottomLeft = new Array(symbolsLength)
+    const symbolsTextBottomRight = new Array(symbolsLength)
+
+    const paytableText = this.add.text(0, -this.height/2.5, 'PAY TABLE', {
+        color: convertColorToString(neonBlueColor),
+        fontSize: '50px',
+        fontFamily: 'PermanentMarker'
+      }).setOrigin(0.5, 0.5)
+
+    const linesText = this.add.text(0, this.height/9, 'LINES', {
+        color: convertColorToString(neonBlueColor),
+        fontSize: '40px',
+        fontFamily: 'PermanentMarker'
+      }).setOrigin(0.5, 0.5)
+
+    const linesTextTop = new Array(symbolsLength)
+
+    const linesRectangles: GameObjects.Rectangle[] = [] // new Array(symbolsLength * visibleSymbolsLength * reelsLength)
+    const size = this.height / 21;
+    for (let i = 0; i < symbolsLength; i++) {
+      for (let j = 0; j < reelsLength; j++) {
+        const x = (i - 2) * this.width / 5 + (j-1) * 40
+        for (let k = 0; k < visibleSymbolsLength; k++) {
+          const y = this.height/3.8 + k * 40
+          linesRectangles.push(new GameObjects.Rectangle (this, x, y, size, size, lines[i][j] === k ? linesColorPalette[i] : whiteColor))
+        }
+      }
+
+      linesTextTop[i] = this.add.text((i - 2) * this.width / 5, + this.height / 5, `Line ${i+1}`, {
+        color: convertColorToString(neonYellowColor),
+        fontSize: '40px',
+        fontFamily: 'PermanentMarker'
+      }).setOrigin(0.5, 0.5)
+
+      topRectangles[i] = new GameObjects.Rectangle(
+        this,
+        (i - 2) * this.width / 5,
+        - this.height / 7,
+        this.width / 6,
+        this.height / 2.8,
+        neonBlueColor
+      )
+      
+      topRectanglesInner[i] = new GameObjects.Rectangle(
+        this,
+        (i - 2) * this.width / 5,
+        - this.height / 7,
+        this.width / 6 - 10,
+        this.height / 2.8 - 10,
+        violetColor
+      )
+
+      symbols[i] = this.add.image((i - 2) * this.width / 5, - this.height / 4.5, 'symbolsAtlas', `s${i + 1}.png`)
+      symbolsTextTopLeft[i] = this.add.text((i - 2) * this.width / 5 - (this.width / 12)/2, - this.height / 9, '3:', {
+        color: convertColorToString(neonYellowColor),
+        fontSize: '50px',
+        fontFamily: 'PermanentMarker'
+      }).setOrigin(0.5, 0.5)
+
+      symbolsTextTopRight[i] = this.add.text((i - 2) * this.width / 5 + (this.width / 14)/2, - this.height / 9, paytable[i][2].toString(), {
+        color: convertColorToString(whiteColor),
+        fontSize: '50px',
+        fontFamily: 'PermanentMarker'
+      }).setOrigin(0.5, 0.5)
+
+      symbolsTextBottomLeft[i] = this.add.text((i - 2) * this.width / 5 - (this.width / 12)/2, - this.height / 30, '2:', {
+        color: convertColorToString(neonYellowColor),
+        fontSize: '50px',
+        fontFamily: 'PermanentMarker'
+      }).setOrigin(0.5, 0.5)
+
+      symbolsTextBottomRight[i] = this.add.text((i - 2) * this.width / 5 + (this.width / 14)/2, - this.height / 30, paytable[i][1].toString(), {
+        color: convertColorToString(whiteColor),
+        fontSize: '50px',
+        fontFamily: 'PermanentMarker'
+      }).setOrigin(0.5, 0.5)
+
+      bottomRectangles[i] = new GameObjects.Rectangle(
+        this,
+        (i - 2) * this.width / 5,
+        + this.height / 3.5,
+        this.width / 6,
+        this.height / 4,
+        neonBlueColor
+      )
+      
+      bottomRectanglesInner[i] = new GameObjects.Rectangle(
+        this,
+        (i - 2) * this.width / 5,
+        + this.height / 3.5,
+        this.width / 6 - 10,
+        this.height / 4 - 10,
+        violetColor
+      )
+    }
+
+    menuContainer.add([rectangle, this.back, ...topRectangles, ...topRectanglesInner, paytableText, linesText, ...bottomRectangles, ...bottomRectanglesInner, ...linesRectangles])
+    menuContainer.add([...symbols, ...symbolsTextTopLeft, ...symbolsTextTopRight, ...symbolsTextBottomLeft, ...symbolsTextBottomRight, ...linesTextTop])
+    return menuContainer
   }
 
-  addStopButton(): Button {
-    return new Button(this, config.scale.width / 2 + 220, config.scale.height - 59, 'stopButton', 0.6, undefined, () =>
-      this.setAutospinValue(false)
-    )
+  showMenu() {
+    this.menuContainer = this.createMenu()
+    this.add.existing(this.menuContainer)
+  }
+
+  hideMenu() {
+    this.menuContainer.destroy()
+  }
+
+  getStopButton(): Button {
+    return (this.info = new Button(
+      this,
+      this.spin.width * this.spinScale * 1.4,
+      (this.spin.height * this.spinScale) / 4,
+      'stopButton',
+      this.smallScale,
+      undefined,
+      () => this.setIsAutospinEnabled(false)
+    ))
   }
 
   getNewPosition(position: number, options: number[], forward?: boolean) {
@@ -244,14 +497,15 @@ export default class MainScene extends Scene {
     return newPosition
   }
 
-  setAutospinValue(autospinValue: boolean) {
-    this.autospinValue = autospinValue
-    if (autospinValue) {
+  setIsAutospinEnabled(isAutospinEnabled: boolean) {
+    this.isAutospinEnabled = isAutospinEnabled
+    if (isAutospinEnabled) {
       this.startSpin(this)
-      this.stop = this.addStopButton()
+      this.stop = this.getStopButton()
+      this.bottomContainer.add(this.stop)
     } else {
       if (this.stop) {
-        this.stop.destroy()
+        this.bottomContainer.remove(this.stop, true)
       }
     }
   }
@@ -265,69 +519,74 @@ export default class MainScene extends Scene {
     this.linesPosition = maxBet
       ? linesOptions.length - 1
       : this.getNewPosition(this.linesPosition, linesOptions, forward)
-    this.linesText.destroy()
+    this.bottomContainer.remove(this.linesText, true)
     this.linesText = this.newLinesText()
+    this.bottomContainer.add(this.linesText)
   }
 
   changeCoins(forward?: boolean, maxBet?: boolean) {
     this.coinsPosition = maxBet
       ? coinsOptions.length - 1
       : this.getNewPosition(this.coinsPosition, coinsOptions, forward)
-    this.coinsText.destroy()
+    this.bottomContainer.remove(this.coinsText, true)
     this.coinsText = this.newCoinsText()
+    this.bottomContainer.add(this.coinsText)
   }
 
   newLinesText(): GameObjects.Text {
     return this.add
-      .text(440, config.scale.height - 183, linesOptions[this.linesPosition].toString(), {
+      .text(-this.spin.width, (-this.spin.width * this.spinScale) / 4, linesOptions[this.linesPosition].toString(), {
         color: convertColorToString(whiteColor),
         fontSize: '50px',
         fontFamily: 'PermanentMarker'
       })
-      .setOrigin(1, 0)
+      .setOrigin(0.5, 0.5)
   }
 
   newCoinsText(): GameObjects.Text {
     return this.add
-      .text(440, config.scale.height - 96, coinsOptions[this.coinsPosition].toString(), {
+      .text(-this.spin.width, (+this.spin.width * this.spinScale) / 4, coinsOptions[this.coinsPosition].toString(), {
         color: convertColorToString(whiteColor),
         fontSize: '50px',
         fontFamily: 'PermanentMarker'
       })
-      .setOrigin(1, 0)
+      .setOrigin(0.5, 0.5)
   }
-
+  /*
   addLemonsAndShow(container: GameObjects.Container) {
     container.add(new Sprite(this, 0, 0, 'lemon', '', true).setOrigin(0, 0).setScale(0.3))
     container.add(new Sprite(this, 40, 0, 'lemon', '', true).setOrigin(0, 0).setScale(0.3))
     container.add(new Sprite(this, 80, 0, 'lemon', '', true).setOrigin(0, 0).setScale(0.3))
     this.add.existing(container)
   }
-
+  */
   startSpin(scene: Scene) {
-    console.log('START SPIN')
     this.blurReels()
     this.shuffle()
-    for (let i = 0; i < this.reels.length; i++) {
+    for (let i = 0; i < reelsLength; i++) {
       scene.tweens.add({
         targets: [this.reels[i].reel],
-        tilePositionY: `+=${(i + 1) * reelsSymbolsLength * symbolSize}`,
+        tilePositionY: `+=${(i + 1) * reelSymbolsLength * symbolSize}`,
         duration: this.reels[i].duration,
         onComplete: () => {
           const tilePositionY = this.reels[i].reel.tilePositionY
           this.reels[i].reel.destroy()
           this.reels[i].reel = this.add.tileSprite(
-            centerSlotX + (i - 1) * reelWidth,
-            centerSlotY,
+            this.centerSlotX + (i - 1) * reelWidth,
+            this.centerSlotY,
             symbolSize,
-            symbolSize * visibleSymbols,
+            symbolSize * visibleSymbolsLength,
             `reel${i + 1}`
           )
           this.reels[i].reel.tilePositionY = tilePositionY
 
-          if (i === this.reels.length - 1) {
-            if (this.autospinValue) {
-              this.time.addEvent({ delay: autospinDelayMs, callback: () => this.startSpin(this), callbackScope: this })
+          if (i === reelsLength - 1) {
+            if (this.isAutospinEnabled) {
+              this.time.addEvent({
+                delay: autospinDelayBetweenSpinsMs,
+                callback: () => this.startSpin(this),
+                callbackScope: this
+              })
             }
           }
         }
@@ -336,22 +595,32 @@ export default class MainScene extends Scene {
   }
 
   shuffle(initialize?: boolean) {
-    for (let i = 0; i < this.reels.length; i++) {
-      const newReelPosition = initialize ? 0 : Math.Between(0, reelsSymbolsLength - 1)
-      this.reels[i].reel.tilePositionY = (newReelPosition - 1) * symbolSize
-      this.currentScreenSymbols[i] = getScreenSymbols(i, newReelPosition)
+    for (let i = 0; i < reelsLength; i++) {
+      if (initialize) {
+        this.reels[i].reel.tilePositionY = 0
+      } else {
+        const newReelPosition = Math.Between(0, reelSymbolsLength - 1)
+        this.reels[i].reel.tilePositionY = (newReelPosition - 1) * symbolSize
+        this.reels[i].currentScreenSymbol = getScreenSymbols(i, newReelPosition)
+      }
     }
-    console.log(this.currentScreenSymbols)
+    if (!initialize) {
+      const win = getWin(this.reels, linesOptions[this.linesPosition])
+      console.log('bare win', win)
+      if (win > 0) {
+        console.log('calculated win', win * coinsOptions[this.coinsPosition])
+      }
+    }
   }
 
   blurReels() {
-    for (let i = 0; i < this.reels.length; i++) {
+    for (let i = 0; i < reelsLength; i++) {
       this.reels[i].reel.destroy()
       this.reels[i].reel = this.add.tileSprite(
-        centerSlotX + (i - 1) * reelWidth,
-        centerSlotY,
+        this.centerSlotX + (i - 1) * reelWidth,
+        this.centerSlotY,
         symbolSize,
-        symbolSize * visibleSymbols,
+        symbolSize * visibleSymbolsLength,
         `reel${i + 1}blurred`
       )
     }
