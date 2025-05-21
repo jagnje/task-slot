@@ -15,8 +15,8 @@ export function numberWithCommas(x: number): string {
   return parts.join('.')
 }
 
-export function calculateRatio(x: number, y: number) {
-  return Math.pow(x/y,0.6)
+export function calculateRatio(x: number, y: number, power: number) {
+  return Math.pow(x / y, power)
 }
 
 export function getScreenSymbols(reel: number, newPosition: number, reelSymbolsLength: number): number[] {
@@ -36,7 +36,11 @@ function getLineSymbols(reel: Reel[], lineSymbols: number[]): number[] {
   return symbols
 }
 
-export function calculateWinAmountAndLines(reel: Reel[], linesValue: number, coinsValue: number): {winningLines: number[], winAmount: number} {
+export function calculateWinAmountAndLines(
+  reel: Reel[],
+  linesValue: number,
+  coinsValue: number
+): { winningLines: number[]; winAmount: number } {
   const winningLines: number[] = []
   let winAmount = 0
 
@@ -63,5 +67,5 @@ export function calculateWinAmountAndLines(reel: Reel[], linesValue: number, coi
     winAmount *= coinsValue
   }
 
-  return {winAmount, winningLines}
+  return { winAmount, winningLines }
 }

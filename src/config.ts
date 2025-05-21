@@ -2,7 +2,7 @@ import { WEBGL, Scale } from 'phaser'
 import { paytable, reelsSymbols } from './game/common'
 import MainScene from './game/mainScene'
 
-export const DEFAULT_WIDTH = 1080
+export const DEFAULT_WIDTH = 1280
 const DEFAULT_MOBILE_WIDTH = 405
 const DEFAULT_HEIGHT = 720
 const isMobile = window.innerWidth < 768
@@ -28,32 +28,34 @@ export default {
 }
 
 interface SlotConfig {
-  isMobile: boolean,
-  orientation: 'portrait' | 'landscape',
-  spinButtonSize: number,
-  reelsDurationBaseMs: number,
-  reelsDurationGapMs: number,
-  symbolsLength: number,
-  reelsLength: number,
-  visibleSymbolsLength: number,
-  symbolSize: number,
-  reelSymbolsLength: number,
-  whiteColor: number,
-  neonYellowColor: number,
-  neonBlueColor: number,
-  linesColorPalette: number[],
-  neonRedColor: number,
-  neonGreenColor: number,
-  violetColor: number,
-  reelWidth: number,
-  lineWidth: number,
-  frameWidth: number,
-  frameWidthNarrow: number,
-  initialBalance: number,
-  coinsOptions: number[],
-  linesOptions: number[],
+  isMobile: boolean
+  orientation: 'portrait' | 'landscape'
+  spinButtonSize: number
+  reelsDurationBaseMs: number
+  reelsDurationGapMs: number
+  symbolsLength: number
+  reelsLength: number
+  visibleSymbolsLength: number
+  symbolSize: number
+  reelSymbolsLength: number
+  whiteColor: number
+  neonYellowColor: number
+  neonBlueColor: number
+  linesColorPalette: number[]
+  neonRedColor: number
+  neonGreenColor: number
+  violetColor: number
+  reelWidthPortrait: number
+  reelWidthLandscape: number
+  lineWidth: number
+  frameWidth: number
+  frameWidthNarrow: number
+  initialBalance: number
+  coinsOptions: number[]
+  linesOptions: number[]
   autospinDelayBetweenSpinsMs: number
   rotationSpeed: number
+  textTweenDuration: number
 }
 
 export const slotConfig: SlotConfig = {
@@ -74,7 +76,8 @@ export const slotConfig: SlotConfig = {
   neonRedColor: 0xff1900,
   neonGreenColor: 0x00ff2e,
   violetColor: 0x220044,
-  reelWidth: 132,
+  reelWidthPortrait: 132,
+  reelWidthLandscape: 260,
   lineWidth: 15,
   frameWidth: 10,
   frameWidthNarrow: 6,
@@ -82,5 +85,6 @@ export const slotConfig: SlotConfig = {
   coinsOptions: [1, 2, 5, 10, 20, 50],
   linesOptions: [1, 2, 3, 4, 5],
   autospinDelayBetweenSpinsMs: 2000,
-  rotationSpeed: 0.1
+  rotationSpeed: 0.1,
+  textTweenDuration: 500
 }

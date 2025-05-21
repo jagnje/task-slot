@@ -11,7 +11,7 @@ export default class Button extends GameObjects.Sprite {
     action?: () => void
   ) {
     super(scene, x, y, texture, frame)
-    this.setInteractive({ cursor: "pointer" })
+    this.setInteractive({ cursor: 'pointer' })
     this.initializeScale(scale)
     if (action) {
       this.on('pointerdown', action, this)
