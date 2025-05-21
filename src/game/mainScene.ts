@@ -56,8 +56,8 @@ export default class MainScene extends Scene {
   // reel
   reels: Reel[]
 
-  // menu
-  menuContainer: GameObjects.Container
+  // info
+  infoContainer: GameObjects.Container
   back: Button
 
   // scaling
@@ -263,7 +263,7 @@ export default class MainScene extends Scene {
       'infoButton',
       this.buttonsScale,
       undefined,
-      () => this.showMenu()
+      () => this.showInfo()
     )
 
     this.minusLines = new Button(
@@ -381,15 +381,15 @@ export default class MainScene extends Scene {
       }
     }
   }
-  createMenu(): GameObjects.Container {
-    const menuContainerHeight = this.height - this.topContainerHeight
-    const menuContainer = new GameObjects.Container(this, this.width / 2, this.height - menuContainerHeight / 2)
-    const rectangle = new GameObjects.Rectangle(this, 0, 0, this.width, menuContainerHeight, slotConfig.violetColor)
+  createInfo(): GameObjects.Container {
+    const infoContainerHeight = this.height - this.topContainerHeight
+    const infoContainer = new GameObjects.Container(this, this.width / 2, this.height - infoContainerHeight / 2)
+    const rectangle = new GameObjects.Rectangle(this, 0, 0, this.width, infoContainerHeight, slotConfig.violetColor)
 
     this.back = new Button(
       this,
       this.width / 2 - (this.info.height / 2) * (this.isMobilePortrait ? 0.25 : this.smallScale),
-      -menuContainerHeight / 2 + (this.info.height / 2) * this.smallScale,
+      -infoContainerHeight / 2 + (this.info.height / 2) * this.smallScale,
       'backButton',
       this.isMobilePortrait ? 0.2 : 0.5,
       undefined,
@@ -577,7 +577,7 @@ export default class MainScene extends Scene {
       )
     }
 
-    menuContainer.add([
+    infoContainer.add([
       rectangle,
       this.back,
       ...topRectangles,
@@ -596,11 +596,11 @@ export default class MainScene extends Scene {
     ])
 
     if (this.isMobilePortrait) {
-      menuContainer.add([...symbolsTextAdditionalLeft, ...symbolsTextAdditionalRight])
+      infoContainer.add([...symbolsTextAdditionalLeft, ...symbolsTextAdditionalRight])
     }
 
-    menuContainer.depth = 2
-    return menuContainer
+    infoContainer.depth = 2
+    return infoContainer
   }
 
   drawLineNumbers() {
@@ -807,13 +807,13 @@ export default class MainScene extends Scene {
     }
   }
 
-  showMenu() {
-    this.menuContainer = this.createMenu()
-    this.add.existing(this.menuContainer)
+  showInfo() {
+    this.infoContainer = this.createInfo()
+    this.add.existing(this.infoContainer)
   }
 
   hideMenu() {
-    this.menuContainer.destroy()
+    this.infoContainer.destroy()
   }
 
   getStopButton(): Button {
