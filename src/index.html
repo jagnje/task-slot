@@ -25,7 +25,7 @@
 
     <title><%= htmlWebpackPlugin.options.gameName %></title>
 
-    <link rel="preload" as="font" href="./assets/font/PermanentMarker-Regular.ttf" type="font/ttf" />
+    <link rel="preload" as="font" href="./assets/font/PlaypenSansDeva-Bold.ttf" type="font/ttf" />
     <style>
       html,
       body {
@@ -34,10 +34,10 @@
         background-color: #000000;
       }
       @font-face {
-        font-family: PermanentMarker;
-        src: url('./assets/font/PermanentMarker-Regular.ttf');
-        font-weight:400;
-        font-weight:normal;
+        font-family: PlaypenSansDevaBold;
+        src: url('./assets/font/PlaypenSansDeva-Bold.ttf');
+        font-weight:700;
+        font-weight:bold;
       }
     </style>
 
@@ -53,7 +53,7 @@
     </script> -->
   </head>
   <body>
-    <div style="font-family: PermanentMarker; position:absolute; left:-1000px; visibility:hidden;">.</div>
+    <div style="font-family: PlaypenSansDevaBold; position:absolute; left:-1000px; visibility:hidden;">.</div>
     <div id="phaser-game"></div>
   </body>
 </html>

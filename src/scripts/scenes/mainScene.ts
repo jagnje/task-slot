@@ -3,7 +3,7 @@ import Button from '../classes/Button'
 import { GameObjects, Scene, Math } from 'phaser'
 import { convertColorToString, numberWithCommas } from '../functions'
 import { symbolsText, reelsSymbols, paytable, lines } from '../common'
-import { Reel } from '../types'
+import { Reel, Line } from '../types'
 
 const reelsDurationBaseMs = 1600
 const reelsDurationGapMs = 700
@@ -19,6 +19,7 @@ const linesColorPalette = [0xff8800, 0xffcc00, 0xb6ff00, 0xffa5, 0x00ddff]
 const neonGreenColor = 0x00ff2e
 const violetColor = 0x220044
 const reelWidth = 180
+const lineWidth = 15
 const frameWidth = 10
 const frameWidthNarrow = 6
 const initialBalance = 100000
@@ -43,10 +44,11 @@ function getLineSymbols(reel: Reel[], linesSymbols: number[]): number[] {
   return symbols
 }
 
-function getWin(reel: Reel[], linesLength: number): number {
-  let win = 0
+function linescalculateWin(reel: Reel[], linesValue: number, coinsValue: number): {winningLines: number[], winAmount: number} {
+  const winningLines: number[] = []
+  let winAmount = 0
 
-  for (let i = 0; i < linesLength; i++) {
+  for (let i = 0; i < linesValue; i++) {
     const line = getLineSymbols(reel, lines[i])
     let leadingSymbolsInLine = 1
     const leadingSymbol = line[0]
@@ -58,13 +60,18 @@ function getWin(reel: Reel[], linesLength: number): number {
       }
     }
 
-    const lineWin = paytable[leadingSymbol - 1][leadingSymbolsInLine - 1]
-    if (lineWin > 0) {
-      win += lineWin
+    const lineWinAmount = paytable[leadingSymbol - 1][leadingSymbolsInLine - 1]
+    if (lineWinAmount > 0) {
+      winAmount += lineWinAmount
+      winningLines.push(i)
     }
   }
 
-  return win
+  if (winAmount) {
+    winAmount *= coinsValue
+  }
+
+  return {winAmount, winningLines}
 }
 
 export default class MainScene extends Scene {
@@ -79,9 +86,14 @@ export default class MainScene extends Scene {
   bottomContainer: GameObjects.Container
   betWinContainer: GameObjects.Container
   bet: GameObjects.Text
-  betText: GameObjects.Text
+  betValue: GameObjects.Text
   win: GameObjects.Text
-  winText: GameObjects.Text
+  winValue: GameObjects.Text
+  balanceValue: GameObjects.Text
+
+  // lines
+  lineContainer: GameObjects.Container
+  lines: Line
 
   // buttons
   spin: Button
@@ -94,11 +106,11 @@ export default class MainScene extends Scene {
   // lines
   plusLines: Button
   minusLines: Button
-  linesText: GameObjects.Text
+  linesValue: GameObjects.Text
   // coins
   plusCoins: Button
   minusCoins: Button
-  coinsText: GameObjects.Text
+  coinsValue: GameObjects.Text
   // reel
   reels: Reel[]
   // menu
@@ -106,17 +118,19 @@ export default class MainScene extends Scene {
   back: Button
 
   // scaling
-  spinScale = 1.3
-  smallScale = this.spinScale / 2
+  smallScale = 0.65
   smallestScale = this.smallScale / 2
 
   // variables
-  linesPosition: number = 0
-  coinsPosition: number = 0
-  balance: number = initialBalance
-  isAutospinEnabled: boolean = false
+  linesPosition = 0
+  coinsPosition = 0
+  balance = initialBalance
+  isAutospinEnabled = false
   topContainerHeight: number
   winAmount = 0
+  winningLines: number[]
+  outerWidth = reelWidth * reelsLength + frameWidth
+  outerHeight = symbolSize * reelsLength
 
   constructor() {
     super({ key: 'MainScene' })
@@ -125,14 +139,13 @@ export default class MainScene extends Scene {
   preload() {
     this.load.atlas('symbolsAtlas', 'assets/img/fruits.png', 'assets/img/fruits.json')
     this.load.image('backButton', 'assets/img/back.png')
-    this.load.image('lemon', 'assets/img/lemon.png')
     this.load.atlas('plusMinusAtlas', 'assets/img/plusminus.png', 'assets/img/plusminus.json')
     this.load.image('spinButton', 'assets/img/spin.png')
     this.load.image('maxbetButton', 'assets/img/maxbet.png')
     this.load.image('autospinButton', 'assets/img/autospin.png')
     this.load.image('infoButton', 'assets/img/info.png')
     this.load.image('stopButton', 'assets/img/stop.png')
-    this.load.image('bg', 'assets/img/bg.png')
+    this.load.image('bg', 'assets/img/bg.webp')
     this.load.image('reel1', 'assets/img/r1.png')
     this.load.image('reel2', 'assets/img/r2.png')
     this.load.image('reel3', 'assets/img/r3.png')
@@ -142,33 +155,33 @@ export default class MainScene extends Scene {
   }
 
   create() {
+    this.lines = {}
+
     this.add.image(this.centerSlotX, this.height / 2, 'bg')
 
     // frame variables
-    const outerWidth = reelWidth * reelsLength + frameWidth
-    const outerHeight = symbolSize * reelsLength
     const yOffset = (reelsLength * symbolSize) / 2 + frameWidth / 2
     const xOffset = (reelsLength * reelWidth) / 2
 
     // frame
-    this.add.rectangle(this.centerSlotX, this.centerSlotY - yOffset, outerWidth, frameWidth, neonYellowColor)
-    this.add.rectangle(this.centerSlotX, this.centerSlotY + yOffset, outerWidth, frameWidth, neonYellowColor)
-    this.add.rectangle(this.centerSlotX - xOffset, this.centerSlotY, frameWidth, outerHeight, neonYellowColor)
-    this.add.rectangle(this.centerSlotX + xOffset, this.centerSlotY, frameWidth, outerHeight, neonYellowColor)
+    this.add.rectangle(this.centerSlotX, this.centerSlotY - yOffset, this.outerWidth, frameWidth, neonYellowColor)
+    this.add.rectangle(this.centerSlotX, this.centerSlotY + yOffset, this.outerWidth, frameWidth, neonYellowColor)
+    this.add.rectangle(this.centerSlotX - xOffset, this.centerSlotY, frameWidth, this.outerHeight, neonYellowColor)
+    this.add.rectangle(this.centerSlotX + xOffset, this.centerSlotY, frameWidth, this.outerHeight, neonYellowColor)
 
     // frame inner
     this.add.rectangle(
       this.centerSlotX - reelWidth / 2,
       this.centerSlotY,
       frameWidthNarrow,
-      outerHeight,
+      this.outerHeight,
       neonYellowColor
     )
     this.add.rectangle(
       this.centerSlotX + reelWidth / 2,
       this.centerSlotY,
       frameWidthNarrow,
-      outerHeight,
+      this.outerHeight,
       neonYellowColor
     )
 
@@ -183,67 +196,51 @@ export default class MainScene extends Scene {
       )
     }
 
-    /*
-    this.containerTopLeft = new GameObjects.Container(this,280,25);
-    this.addLemonsAndShow(this.containerTopLeft);
-
-    this.containerTopRight = new GameObjects.Container(this,680,25);
-    this.addLemonsAndShow(this.containerTopRight);
-    */
-
     this.topContainerHeight = this.centerSlotY - yOffset - frameWidth / 2
-    const bottomContainerHeight = this.height - this.topContainerHeight - outerHeight - frameWidth * 5
-
-    // containers
+    const bottomContainerHeight = this.height - this.topContainerHeight - this.outerHeight - frameWidth * 6
 
     // top container
     this.topContainer = new GameObjects.Container(this, this.centerSlotX, this.topContainerHeight / 2 - frameWidth / 2)
 
     this.topContainer.add(
       this.add
-        .text(-outerWidth / 2, 0, 'FRUIT SLOT', {
+        .text(-this.outerWidth / 2, 5, 'FRUIT SLOT', {
           color: convertColorToString(neonYellowColor),
           fontSize: '65px',
-          fontFamily: 'PermanentMarker'
+          fontFamily: 'PlaypenSansDevaBold'
         })
         .setOrigin(0, 0.5)
     )
 
     this.topContainer.add(
       this.add
-        .text(outerWidth / 2, -15, 'BALANCE', {
+        .text(this.outerWidth / 2, -10, 'BALANCE', {
           color: convertColorToString(whiteColor),
           fontSize: '26px',
-          fontFamily: 'PermanentMarker'
+          fontFamily: 'PlaypenSansDevaBold'
         })
         .setOrigin(1, 0.5)
     )
 
-    this.topContainer.add(
-      this.add
-        .text(outerWidth / 2, 15, `${numberWithCommas(this.balance)} $`, {
-          color: convertColorToString(whiteColor),
-          fontSize: '26px',
-          fontFamily: 'PermanentMarker'
-        })
-        .setOrigin(1, 0.5)
-    )
+    this.balanceValue = this.getBalanceValue()
+
+    this.topContainer.add([this.balanceValue])
 
     this.add.existing(this.topContainer)
 
-    this.spin = new Button(this, 0, 0, 'spinButton', this.spinScale, undefined, () => this.startSpin(this))
+    this.spin = new Button(this, 0, 0, 'spinButton', 1, undefined, () => this.startSpin(this))
 
-    this.betWinContainer = new GameObjects.Container(this, this.centerSlotX, this.height - bottomContainerHeight / 0.95)
+    this.betWinContainer = new GameObjects.Container(this, this.centerSlotX, this.height - bottomContainerHeight / 0.93)
     this.bet = this.add
-      .text(-outerWidth / 2, 0, 'BET', {
+      .text(-this.outerWidth / 2, 0, 'BET', {
         color: convertColorToString(neonYellowColor),
         fontSize: '26px',
-        fontFamily: 'PermanentMarker'
+        fontFamily: 'PlaypenSansDevaBold'
       })
       .setOrigin(0, 0.5)
 
-    this.betText = this.getBetText()
-    this.betWinContainer.add([this.bet, this.betText])
+    this.betValue = this.getBetValue()
+    this.betWinContainer.add([this.bet, this.betValue])
     this.add.existing(this.betWinContainer)
 
     this.bottomContainer = new GameObjects.Container(this, this.centerSlotX, this.height - bottomContainerHeight / 2)
@@ -252,8 +249,8 @@ export default class MainScene extends Scene {
 
     this.maxbet = new Button(
       this,
-      this.spin.width * this.spinScale * 0.85,
-      (-this.spin.height * this.spinScale) / 4,
+      this.spin.width * 0.85,
+      -this.spin.height / 4,
       'maxbetButton',
       this.smallScale,
       undefined,
@@ -262,8 +259,8 @@ export default class MainScene extends Scene {
 
     this.autospin = new Button(
       this,
-      this.spin.width * this.spinScale * 0.85,
-      (this.spin.height * this.spinScale) / 4,
+      this.spin.width * 0.85,
+      this.spin.height / 4,
       'autospinButton',
       this.smallScale,
       undefined,
@@ -272,8 +269,8 @@ export default class MainScene extends Scene {
 
     this.info = new Button(
       this,
-      this.spin.width * this.spinScale * 1.4,
-      (-this.spin.height * this.spinScale) / 4,
+      this.spin.width * 1.4,
+      -this.spin.height / 4,
       'infoButton',
       this.smallScale,
       undefined,
@@ -282,62 +279,62 @@ export default class MainScene extends Scene {
 
     this.minusLines = new Button(
       this,
-      -outerWidth / 2,
-      this.bottomContainer.height / 2 - (this.spin.height / 3.5) * this.spinScale,
+      -this.outerWidth / 2,
+      this.bottomContainer.height / 2 - this.spin.height / 3.5,
       'plusMinusAtlas',
       this.smallestScale,
       'minus.png',
-      () => this.changeLines()
+      () => this.changeLinesValue()
     ).setOrigin(0, 0)
 
     this.plusLines = new Button(
       this,
-      -outerWidth / 2 + this.minusLines.width * this.smallestScale * 1.1,
-      this.bottomContainer.height / 2 - (this.spin.height / 3.5) * this.spinScale,
+      -this.outerWidth / 2 + this.minusLines.width * this.smallestScale * 1.1,
+      this.bottomContainer.height / 2 - this.spin.height / 3.5,
       'plusMinusAtlas',
       this.smallestScale,
       'plus.png',
-      () => this.changeLines(true)
+      () => this.changeLinesValue(true)
     ).setOrigin(0, 0)
+
+    const linesText = this.add
+      .text(-this.outerWidth / 2, this.bottomContainer.height / 2 - this.spin.height / 2, 'LINES', {
+        color: convertColorToString(whiteColor),
+        fontSize: '26px',
+        fontFamily: 'PlaypenSansDevaBold'
+      })
+      .setOrigin(0, 0)
 
     this.minusCoins = new Button(
       this,
-      -outerWidth / 2,
-      -(this.bottomContainer.height / 2 - (this.spin.height / 3.5) * this.spinScale),
+      -this.outerWidth / 2,
+      -(this.bottomContainer.height / 2 - this.spin.height / 2),
       'plusMinusAtlas',
       this.smallestScale,
       'minus.png',
-      () => this.changeCoins()
+      () => this.changeCoinsValue()
     ).setOrigin(0, 1)
 
     this.plusCoins = new Button(
       this,
-      -outerWidth / 2 + this.minusLines.width * this.smallestScale * 1.1,
-      -(this.bottomContainer.height / 2 - (this.spin.height / 3.5) * this.spinScale),
+      -this.outerWidth / 2 + this.minusLines.width * this.smallestScale * 1.1,
+      -(this.bottomContainer.height / 2 - this.spin.height / 2),
       'plusMinusAtlas',
       this.smallestScale,
       'plus.png',
-      () => this.changeCoins(true)
+      () => this.changeCoinsValue(true)
     ).setOrigin(0, 1)
 
-    const linesText = this.add
-      .text(-outerWidth / 2, this.bottomContainer.height / 2 - this.spin.height / 2 * this.spinScale, 'LINES', {
-        color: convertColorToString(whiteColor),
-        fontSize: '26px',
-        fontFamily: 'PermanentMarker'
-      })
-      .setOrigin(0, 0)
-
     const coinsText = this.add
-      .text(-outerWidth / 2, -(this.bottomContainer.height / 2 - this.spin.height / 2 * this.spinScale), 'COINS', {
+      .text(-this.outerWidth / 2, -(this.bottomContainer.height / 2 - this.spin.height / 4), 'COINS', {
         color: convertColorToString(whiteColor),
         fontSize: '26px',
-        fontFamily: 'PermanentMarker'
+        fontFamily: 'PlaypenSansDevaBold'
       })
       .setOrigin(0, 1)
 
-    this.linesText = this.getLinesText()
-    this.coinsText = this.getCoinsText()
+    this.linesValue = this.getLinesValue()
+    this.coinsValue = this.getCoinsValue()
 
     this.bottomContainer.add([
       this.spin,
@@ -347,11 +344,11 @@ export default class MainScene extends Scene {
       linesText,
       this.plusLines,
       this.minusLines,
-      this.linesText,
+      this.linesValue,
       coinsText,
       this.plusCoins,
       this.minusCoins,
-      this.coinsText
+      this.coinsValue
     ])
 
     this.add.existing(this.bottomContainer)
@@ -371,6 +368,9 @@ export default class MainScene extends Scene {
         currentScreenSymbol: new Array(visibleSymbolsLength).fill(null)
       }
     }
+    this.lineContainer = new GameObjects.Container(this, 0, 0)
+    this.add.existing(this.lineContainer)
+    this.lineContainer.depth = 1
     this.shuffle(true)
   }
 
@@ -399,18 +399,18 @@ export default class MainScene extends Scene {
     const symbolsTextBottomRight = new Array(symbolsLength)
 
     const paytableText = this.add
-      .text(0, -this.height / 2.5, 'PAY TABLE', {
+      .text(0, -this.height / 2.6, 'PAY TABLE', {
         color: convertColorToString(neonBlueColor),
         fontSize: '50px',
-        fontFamily: 'PermanentMarker'
+        fontFamily: 'PlaypenSansDevaBold'
       })
       .setOrigin(0.5, 0.5)
 
     const linesText = this.add
-      .text(0, this.height / 9, 'LINES', {
+      .text(0, this.height / 10, 'LINES', {
         color: convertColorToString(neonBlueColor),
         fontSize: '40px',
-        fontFamily: 'PermanentMarker'
+        fontFamily: 'PlaypenSansDevaBold'
       })
       .setOrigin(0.5, 0.5)
 
@@ -422,7 +422,7 @@ export default class MainScene extends Scene {
       for (let j = 0; j < reelsLength; j++) {
         const x = ((i - 2) * this.width) / 5 + (j - 1) * 40
         for (let k = 0; k < visibleSymbolsLength; k++) {
-          const y = this.height / 3.8 + k * 40
+          const y = this.height / 3.9 + k * 40
           linesRectangles.push(
             new GameObjects.Rectangle(this, x, y, size, size, lines[i][j] === k ? linesColorPalette[i] : whiteColor)
           )
@@ -433,7 +433,7 @@ export default class MainScene extends Scene {
         .text(((i - 2) * this.width) / 5, +this.height / 5, `Line ${i + 1}`, {
           color: convertColorToString(neonYellowColor),
           fontSize: '40px',
-          fontFamily: 'PermanentMarker'
+          fontFamily: 'PlaypenSansDevaBold'
         })
         .setOrigin(0.5, 0.5)
 
@@ -457,34 +457,34 @@ export default class MainScene extends Scene {
 
       symbols[i] = this.add.image(((i - 2) * this.width) / 5, -this.height / 4.5, 'symbolsAtlas', `s${i + 1}.png`)
       symbolsTextTopLeft[i] = this.add
-        .text(((i - 2) * this.width) / 5 - this.width / 12 / 2, -this.height / 9, '3:', {
+        .text(((i - 2) * this.width) / 5 - this.width / 12 / 2, -this.height / 10, '3:', {
           color: convertColorToString(neonYellowColor),
           fontSize: '50px',
-          fontFamily: 'PermanentMarker'
+          fontFamily: 'PlaypenSansDevaBold'
         })
         .setOrigin(0.5, 0.5)
 
       symbolsTextTopRight[i] = this.add
-        .text(((i - 2) * this.width) / 5 + this.width / 14 / 2, -this.height / 9, paytable[i][2].toString(), {
+        .text(((i - 2) * this.width) / 5 + this.width / 16 / 2, -this.height / 10, paytable[i][2].toString(), {
           color: convertColorToString(whiteColor),
           fontSize: '50px',
-          fontFamily: 'PermanentMarker'
+          fontFamily: 'PlaypenSansDevaBold'
         })
         .setOrigin(0.5, 0.5)
 
       symbolsTextBottomLeft[i] = this.add
-        .text(((i - 2) * this.width) / 5 - this.width / 12 / 2, -this.height / 30, '2:', {
+        .text(((i - 2) * this.width) / 5 - this.width / 12 / 2, -this.height / 40, '2:', {
           color: convertColorToString(neonYellowColor),
           fontSize: '50px',
-          fontFamily: 'PermanentMarker'
+          fontFamily: 'PlaypenSansDevaBold'
         })
         .setOrigin(0.5, 0.5)
 
       symbolsTextBottomRight[i] = this.add
-        .text(((i - 2) * this.width) / 5 + this.width / 14 / 2, -this.height / 30, paytable[i][1].toString(), {
+        .text(((i - 2) * this.width) / 5 + this.width / 14 / 2, -this.height / 40, paytable[i][1].toString(), {
           color: convertColorToString(whiteColor),
           fontSize: '50px',
-          fontFamily: 'PermanentMarker'
+          fontFamily: 'PlaypenSansDevaBold'
         })
         .setOrigin(0.5, 0.5)
 
@@ -529,6 +529,129 @@ export default class MainScene extends Scene {
     return menuContainer
   }
 
+  drawLine(line: number) {
+    const color = linesColorPalette[line]
+    switch (line) {
+      case 0:
+        this.lines.rectangle1 = this.add
+          .rectangle(this.centerSlotX, this.topContainerHeight + (symbolSize / 2) * 3.2, this.outerWidth, lineWidth, color)
+          .setOrigin(0.5, 0)
+        this.lineContainer.add(this.lines.rectangle1)
+      break;
+
+      case 1:
+        this.lines.rectangle2 = this.add
+          .rectangle(this.centerSlotX, this.topContainerHeight + (symbolSize / 2) * 1.2, this.outerWidth, lineWidth, color)
+          .setOrigin(0.5, 0)
+        this.lineContainer.add(this.lines.rectangle2)
+      break;
+
+      case 2:
+        this.lines.rectangle3 = this.add
+          .rectangle(this.centerSlotX, this.topContainerHeight + (symbolSize / 2) * 5.2, this.outerWidth, lineWidth, color)
+          .setOrigin(0.5, 0)
+
+        this.lineContainer.add(this.lines.rectangle3)
+      break;
+
+      case 3:
+        this.lines.triangle41 = this.add
+          .triangle(
+            this.centerSlotX,
+            this.centerSlotY,
+            0,
+            0,
+            this.outerWidth,
+            this.outerHeight,
+            this.outerWidth,
+            this.outerHeight + lineWidth,
+            color
+          )
+          .setOrigin(0.5, 0.5)
+
+        this.lines.triangle42 = this.add
+          .triangle(
+            this.centerSlotX,
+            this.centerSlotY,
+            0,
+            0,
+            0,
+            lineWidth,
+            this.outerWidth,
+            this.outerHeight + lineWidth,
+            color
+          )
+          .setOrigin(0.5, 0.5)
+
+        this.lineContainer.add(this.lines.triangle41)
+        this.lineContainer.add(this.lines.triangle42)
+      break;
+
+      case 4:
+        this.lines.triangle51 = this.add
+          .triangle(
+            this.centerSlotX,
+            this.centerSlotY,
+            this.outerWidth,
+            0,
+            0,
+            this.outerHeight,
+            0,
+            this.outerHeight + lineWidth,
+            color
+          )
+          .setOrigin(0.5, 0.5)
+
+        this.lines.triangle52 = this.add
+          .triangle(
+            this.centerSlotX,
+            this.centerSlotY,
+            this.outerWidth,
+            0,
+            this.outerWidth,
+            lineWidth,
+            0,
+            this.outerHeight + lineWidth,
+            color
+          )
+          .setOrigin(0.5, 0.5)
+
+        this.lineContainer.add(this.lines.triangle51)
+        this.lineContainer.add(this.lines.triangle52)
+      break;
+    }
+  }
+
+  removeAllLines() {
+    if (this.lines.rectangle1) {
+      this.lineContainer.remove(this.lines.rectangle1, true)
+    }
+
+    if (this.lines.rectangle2) {
+      this.lineContainer.remove(this.lines.rectangle2, true)
+    }
+
+    if (this.lines.rectangle3) {
+      this.lineContainer.remove(this.lines.rectangle3, true)
+    }
+
+    if (this.lines.triangle41) {
+      this.lineContainer.remove(this.lines.triangle41, true)
+    }
+
+    if (this.lines.triangle42) {
+      this.lineContainer.remove(this.lines.triangle42, true)
+    }
+
+    if (this.lines.triangle51) {
+      this.lineContainer.remove(this.lines.triangle51, true)
+    }
+
+    if (this.lines.triangle52) {
+      this.lineContainer.remove(this.lines.triangle52, true)
+    }
+  }
+
   showMenu() {
     this.menuContainer = this.createMenu()
     this.add.existing(this.menuContainer)
@@ -541,8 +664,8 @@ export default class MainScene extends Scene {
   getStopButton(): Button {
     return (this.info = new Button(
       this,
-      this.spin.width * this.spinScale * 1.4,
-      (this.spin.height * this.spinScale) / 4,
+      this.spin.width * 1.4,
+      this.spin.height / 4,
       'stopButton',
       this.smallScale,
       undefined,
@@ -574,84 +697,110 @@ export default class MainScene extends Scene {
   }
 
   setMaxBet() {
-    this.changeLines(undefined, true)
-    this.changeCoins(undefined, true)
+    this.changeLinesValue(undefined, true)
+    this.changeCoinsValue(undefined, true)
   }
 
-  changeLines(forward?: boolean, maxBet?: boolean) {
+  changeLinesValue(forward?: boolean, maxBet?: boolean) {
     this.linesPosition = maxBet
       ? linesOptions.length - 1
       : this.getNewPosition(this.linesPosition, linesOptions, forward)
-    this.bottomContainer.remove(this.linesText, true)
-    this.linesText = this.getLinesText()
-    this.bottomContainer.add(this.linesText)
-    this.changeBet()
+    this.bottomContainer.remove(this.linesValue, true)
+    this.linesValue = this.getLinesValue()
+    this.bottomContainer.add(this.linesValue)
+    this.changeBetValue()
   }
 
-  changeCoins(forward?: boolean, maxBet?: boolean) {
+  changeCoinsValue(forward?: boolean, maxBet?: boolean) {
     this.coinsPosition = maxBet
       ? coinsOptions.length - 1
       : this.getNewPosition(this.coinsPosition, coinsOptions, forward)
-    this.bottomContainer.remove(this.coinsText, true)
-    this.coinsText = this.getCoinsText()
-    this.bottomContainer.add(this.coinsText)
-    this.changeBet()
+    this.bottomContainer.remove(this.coinsValue, true)
+    this.coinsValue = this.getCoinsValue()
+    this.bottomContainer.add(this.coinsValue)
+    this.changeBetValue()
   }
 
-  changeBet() {
-    this.betWinContainer.remove(this.betText, true)
-    this.betText = this.getBetText()
-    this.betWinContainer.add(this.betText)
+  changeBetValue() {
+    this.betWinContainer.remove(this.betValue, true)
+    this.betValue = this.getBetValue()
+    this.betWinContainer.add(this.betValue)
   }
 
-  getLinesText(): GameObjects.Text {
+  getLinesValue(): GameObjects.Text {
     return this.add
-      .text(-this.spin.width, - this.spin.height / 3 * this.spinScale, linesOptions[this.linesPosition].toString(), {
+      .text(-this.spin.width / 1.2, -this.spin.height / 3.5, linesOptions[this.linesPosition].toString(), {
         color: convertColorToString(whiteColor),
-        fontSize: '50px',
-        fontFamily: 'PermanentMarker'
+        fontSize: '45px',
+        fontFamily: 'PlaypenSansDevaBold'
       })
       .setOrigin(0.5, 0.5)
   }
 
-  getCoinsText(): GameObjects.Text {
+  getCoinsValue(): GameObjects.Text {
     return this.add
-      .text(-this.spin.width, + this.spin.height / 4 * this.spinScale, coinsOptions[this.coinsPosition].toString(), {
+      .text(-this.spin.width / 1.2, +this.spin.height / 4.2, coinsOptions[this.coinsPosition].toString(), {
         color: convertColorToString(whiteColor),
-        fontSize: '50px',
-        fontFamily: 'PermanentMarker'
+        fontSize: '45px',
+        fontFamily: 'PlaypenSansDevaBold'
       })
       .setOrigin(0.5, 0.5)
   }
 
-  getBetText(): GameObjects.Text {
+  calculateBet(): number {
+    return linesOptions[this.linesPosition] * coinsOptions[this.coinsPosition]
+  }
+
+  getBetValue(): GameObjects.Text {
     return this.add
-      .text(-this.spin.width, 0, (linesOptions[this.linesPosition] * coinsOptions[this.coinsPosition]).toString(), {
+      .text(-this.spin.width / 1.2, 0, this.calculateBet().toString(), {
         color: convertColorToString(neonYellowColor),
         fontSize: '40px',
-        fontFamily: 'PermanentMarker'
+        fontFamily: 'PlaypenSansDevaBold'
       })
       .setOrigin(0.5, 0.5)
   }
 
-  getWinText(win: number): GameObjects.Text {
+  getWin() {
     return this.add
-      .text(this.spin.width, 0, (win).toString(), {
+      .text(0, 0, `WIN!!!`, {
         color: convertColorToString(neonGreenColor),
-        fontSize: '40px',
-        fontFamily: 'PermanentMarker'
+        fontSize: '50px',
+        fontFamily: 'PlaypenSansDevaBold'
       })
       .setOrigin(0.5, 0.5)
-  }  
-  /*
-  addLemonsAndShow(container: GameObjects.Container) {
-    container.add(new Sprite(this, 0, 0, 'lemon', '', true).setOrigin(0, 0).setScale(0.3))
-    container.add(new Sprite(this, 40, 0, 'lemon', '', true).setOrigin(0, 0).setScale(0.3))
-    container.add(new Sprite(this, 80, 0, 'lemon', '', true).setOrigin(0, 0).setScale(0.3))
-    this.add.existing(container)
   }
-  */
+
+  getWinValue(): GameObjects.Text {
+    return this.add
+      .text(this.outerWidth / 2, 0, `${numberWithCommas(this.winAmount)} $`, {
+        color: convertColorToString(neonGreenColor),
+        fontSize: '40px',
+        fontFamily: 'PlaypenSansDevaBold'
+      })
+      .setOrigin(1, 0.5)
+  }
+
+  updateBalance(changeBalance: number) {
+    this.balance += changeBalance
+    this.topContainer.remove(this.balanceValue, true)
+    this.balanceValue = this.getBalanceValue()
+    this.topContainer.add(this.balanceValue)
+  }
+
+  getBalanceValue(): GameObjects.Text {
+    return this.add
+      .text(this.outerWidth / 2, 20, `${numberWithCommas(this.balance)}$`, {
+        color: convertColorToString(whiteColor),
+        fontSize: '26px',
+        fontFamily: 'PlaypenSansDevaBold'
+      })
+      .setOrigin(1, 0.5)
+  }
+
   startSpin(scene: Scene) {
+    this.removeAllLines()
+    this.updateBalance(-this.calculateBet())
     this.blurReels()
     this.shuffle()
     for (let i = 0; i < reelsLength; i++) {
@@ -673,14 +822,19 @@ export default class MainScene extends Scene {
 
           if (i === reelsLength - 1) {
             if (this.winAmount > 0) {
-              this.winText = this.getWinText(this.winAmount)
+              this.winValue = this.getWinValue()
+              this.updateBalance(this.winAmount)
               this.win = this.getWin()
-              this.betWinContainer.add([this.win, this.winText])
+              this.betWinContainer.add([this.win, this.winValue])
+            }
+
+            for (let j = 0; j < this.winningLines.length; j++) {
+              this.drawLine(this.winningLines[j])
             }
 
             if (this.isAutospinEnabled) {
               this.time.addEvent({
-                delay: reelsDurationBaseMs + (reelsLength - 1) * reelsDurationGapMs,
+                delay: autospinDelayBetweenSpinsMs,
                 callback: () => this.startSpin(this),
                 callbackScope: this
               })
@@ -705,25 +859,20 @@ export default class MainScene extends Scene {
       if (this.win) {
         this.betWinContainer.remove(this.win, true)
       }
-      if (this.winText) {
-        this.betWinContainer.remove(this.winText, true)
+
+      if (this.winValue) {
+        this.betWinContainer.remove(this.winValue, true)
       }
 
-      this.winAmount = getWin(this.reels, linesOptions[this.linesPosition])
-      if (this.winAmount) {
-        this.winAmount *= coinsOptions[this.coinsPosition]
-      }
+      const {winAmount, winningLines} = linescalculateWin(
+        this.reels,
+        linesOptions[this.linesPosition],
+        coinsOptions[this.coinsPosition]
+      )
+
+      this.winAmount = winAmount;
+      this.winningLines = winningLines
     }
-  }
-
-  getWin() {
-    return this.add
-      .text(0, 0, 'WIN', {
-        color: convertColorToString(neonGreenColor),
-        fontSize: '26px',
-        fontFamily: 'PermanentMarker'
-      })
-      .setOrigin(0.5, 0.5)
   }
 
   blurReels() {
