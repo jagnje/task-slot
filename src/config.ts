@@ -27,9 +27,38 @@ export default {
   }
 }
 
-export const slotConfig = {
+interface SlotConfig {
+  isMobile: boolean,
+  orientation: 'portrait' | 'landscape',
+  spinButtonSize: number,
+  reelsDurationBaseMs: number,
+  reelsDurationGapMs: number,
+  symbolsLength: number,
+  reelsLength: number,
+  visibleSymbolsLength: number,
+  symbolSize: number,
+  reelSymbolsLength: number,
+  whiteColor: number,
+  neonYellowColor: number,
+  neonBlueColor: number,
+  linesColorPalette: number[],
+  neonRedColor: number,
+  neonGreenColor: number,
+  violetColor: number,
+  reelWidth: number,
+  lineWidth: number,
+  frameWidth: number,
+  frameWidthNarrow: number,
+  initialBalance: number,
+  coinsOptions: number[],
+  linesOptions: number[],
+  autospinDelayBetweenSpinsMs: number
+}
+
+export const slotConfig: SlotConfig = {
   isMobile,
-  isPortrait,
+  orientation: isPortrait ? 'portrait' : 'landscape',
+  spinButtonSize: 156,
   reelsDurationBaseMs: 1600,
   reelsDurationGapMs: 700,
   symbolsLength: paytable.length,
