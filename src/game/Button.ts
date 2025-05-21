@@ -1,9 +1,6 @@
-import Sprite from '../classes/Sprite'
 import { GameObjects } from 'phaser'
-export default class Button extends GameObjects.Sprite {
-  // scene: Phaser.Scene
-  // sprite: Sprite
 
+export default class Button extends GameObjects.Sprite {
   constructor(
     scene: Phaser.Scene,
     x: number,

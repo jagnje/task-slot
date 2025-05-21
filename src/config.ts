@@ -1,9 +1,9 @@
 import { WEBGL, Scale } from 'phaser'
-import { symbolsText, reelsSymbols } from './scripts/common'
-import MainScene from './scripts/scenes/mainScene'
+import { paytable, reelsSymbols } from './game/common'
+import MainScene from './game/mainScene'
 
 export const DEFAULT_WIDTH = 1080
-const DEFAULT_MOBILE_WIDTH = 550
+const DEFAULT_MOBILE_WIDTH = 460
 const DEFAULT_HEIGHT = 720
 const isMobile = window.innerWidth < 768
 const isPortrait = window.matchMedia('(orientation: portrait)').matches
@@ -28,9 +28,11 @@ export default {
 }
 
 export const slotConfig = {
+  isMobile,
+  isPortrait,
   reelsDurationBaseMs: 1600,
   reelsDurationGapMs: 700,
-  symbolsLength: symbolsText.length,
+  symbolsLength: paytable.length,
   reelsLength: 3,
   visibleSymbolsLength: 3,
   symbolSize: 138,
@@ -42,12 +44,12 @@ export const slotConfig = {
   neonRedColor: 0xff1900,
   neonGreenColor: 0x00ff2e,
   violetColor: 0x220044,
-  reelWidth: 180,
+  reelWidth: 150,
   lineWidth: 15,
   frameWidth: 10,
   frameWidthNarrow: 6,
   initialBalance: 100000,
   coinsOptions: [1, 2, 5, 10, 20, 50, 100],
   linesOptions: [1, 2, 3, 4, 5],
-  autospinDelayBetweenSpinsMs: 1000
+  autospinDelayBetweenSpinsMs: 2000
 }

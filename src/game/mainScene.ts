@@ -1,9 +1,9 @@
-import config, {DEFAULT_WIDTH, slotConfig} from '../../config'
-import Button from '../classes/Button'
+import config, {DEFAULT_WIDTH, slotConfig} from '../config'
+import Button from './Button'
 import { GameObjects, Scene, Math } from 'phaser'
-import { convertColorToString, numberWithCommas, calculateRatio, getScreenSymbols, calculateWinAmountAndLines } from '../functions'
-import { symbolsText, reelsSymbols, paytable, lines } from '../common'
-import { Reel, Line } from '../types'
+import { convertColorToString, numberWithCommas, calculateRatio, getScreenSymbols, calculateWinAmountAndLines } from './functions'
+import { paytable, lines } from './common'
+import { Reel, Line } from './types'
 export default class MainScene extends Scene {
   // dimensions
   width = config.scale.width
@@ -54,8 +54,8 @@ export default class MainScene extends Scene {
   back: Button
 
   // scaling
-  smallScale = 0.65
-  smallestScale = this.smallScale / 2
+  smallScale = 0.6
+  smallestScale = 0.35
 
   // variables
   linesPosition = 0
@@ -67,6 +67,7 @@ export default class MainScene extends Scene {
   winningLines: number[]
   outerWidth = slotConfig.reelWidth * slotConfig.reelsLength + slotConfig.frameWidth
   outerHeight = slotConfig.symbolSize * slotConfig.reelsLength
+  isSpinning = false
 
   constructor() {
     super({ key: 'MainScene' })
@@ -140,7 +141,7 @@ export default class MainScene extends Scene {
 
     this.topContainer.add(
       this.add
-        .text(-this.outerWidth / 2, 5, 'FRUIT SLOT', {
+        .text(-this.outerWidth / 2, 5, 'FRUITS', {
           color: convertColorToString(slotConfig.neonYellowColor),
           fontSize: '65px',
           fontFamily: 'PlaypenSansDevaBold'
@@ -184,7 +185,7 @@ export default class MainScene extends Scene {
     // buttons
     this.maxbet = new Button(
       this,
-      this.spin.width * 0.85,
+      this.spin.width * 0.72,
       -this.spin.height / 4,
       'maxbetButton',
       this.smallScale,
@@ -194,7 +195,7 @@ export default class MainScene extends Scene {
 
     this.autospin = new Button(
       this,
-      this.spin.width * 0.85,
+      this.spin.width * 0.72,
       this.spin.height / 4,
       'autospinButton',
       this.smallScale,
@@ -204,7 +205,7 @@ export default class MainScene extends Scene {
 
     this.info = new Button(
       this,
-      this.spin.width * 1.4,
+      this.spin.width * 1.22,
       -this.spin.height / 4,
       'infoButton',
       this.smallScale,
@@ -607,7 +608,7 @@ export default class MainScene extends Scene {
   getStopButton(): Button {
     return (this.info = new Button(
       this,
-      this.spin.width * 1.4,
+      this.spin.width * 1.22,
       this.spin.height / 4,
       'stopButton',
       this.smallScale,
@@ -679,9 +680,9 @@ export default class MainScene extends Scene {
 
   getLinesValue(): GameObjects.Text {
     return this.add
-      .text(-this.spin.width / 1.2, -this.spin.height / 3.5, slotConfig.linesOptions[this.linesPosition].toString(), {
+      .text(-this.spin.width / 1.5, -this.spin.height / 3.5, slotConfig.linesOptions[this.linesPosition].toString(), {
         color: convertColorToString(slotConfig.whiteColor),
-        fontSize: '45px',
+        fontSize: '30px',
         fontFamily: 'PlaypenSansDevaBold'
       })
       .setOrigin(0.5, 0.5)
@@ -689,9 +690,9 @@ export default class MainScene extends Scene {
 
   getCoinsValue(): GameObjects.Text {
     return this.add
-      .text(-this.spin.width / 1.2, +this.spin.height / 4.2, slotConfig.coinsOptions[this.coinsPosition].toString(), {
+      .text(-this.spin.width / 1.5, +this.spin.height / 4.2, slotConfig.coinsOptions[this.coinsPosition].toString(), {
         color: convertColorToString(slotConfig.whiteColor),
-        fontSize: '45px',
+        fontSize: '30px',
         fontFamily: 'PlaypenSansDevaBold'
       })
       .setOrigin(0.5, 0.5)
@@ -703,7 +704,7 @@ export default class MainScene extends Scene {
 
   getBetValue(): GameObjects.Text {
     return this.add
-      .text(-this.spin.width / 1.2, 0, this.calculateBet().toString(), {
+      .text(-this.spin.width / 1.5, 0, this.calculateBet().toString(), {
         color: convertColorToString(slotConfig.neonYellowColor),
         fontSize: '40px',
         fontFamily: 'PlaypenSansDevaBold'
@@ -713,9 +714,9 @@ export default class MainScene extends Scene {
 
   getMessageWin() {
     return this.add
-      .text(0, 0, 'WIN!!!', {
+      .text(0, 0, 'WIN!', {
         color: convertColorToString(slotConfig.neonGreenColor),
-        fontSize: '50px',
+        fontSize: '40px',
         fontFamily: 'PlaypenSansDevaBold'
       })
       .setOrigin(0.5, 0.5)
@@ -733,9 +734,9 @@ export default class MainScene extends Scene {
 
   getWinValue(): GameObjects.Text {
     return this.add
-      .text(this.outerWidth / 2, 0, `${numberWithCommas(this.winAmount)} $`, {
+      .text(this.outerWidth / 2, 0, `${numberWithCommas(this.winAmount)}00 $`, {
         color: convertColorToString(slotConfig.neonGreenColor),
-        fontSize: '40px',
+        fontSize: '30px',
         fontFamily: 'PlaypenSansDevaBold'
       })
       .setOrigin(1, 0.5)
@@ -759,63 +760,66 @@ export default class MainScene extends Scene {
   }
 
   startSpin(scene: Scene) {
-    this.removeAllLines()
-    const bet = this.calculateBet()
-    if (this.balance >= bet) {
-      this.updateBalance(-bet)
-      this.blurReels()
-      this.shuffle()
-      for (let i = 0; i < slotConfig.reelsLength; i++) {
-        scene.tweens.add({
-          targets: [this.reels[i].reel],
-          tilePositionY: `+=${(i + 1) * slotConfig.reelSymbolsLength * slotConfig.symbolSize}`,
-          duration: this.reels[i].duration,
-          onComplete: () => {
-            const tilePositionY = this.reels[i].reel.tilePositionY
-            this.reels[i].reel.destroy()
-            this.reels[i].reel = this.add.tileSprite(
-              this.centerSlotX + (i - 1) * slotConfig.reelWidth,
-              this.centerSlotY,
-              slotConfig.symbolSize,
-              slotConfig.symbolSize * slotConfig.visibleSymbolsLength,
-              `reel${i + 1}`
-            )
-            this.reels[i].reel.tilePositionY = tilePositionY
+    if (!this.isSpinning) {
+      this.isSpinning = true
+      this.removeAllLines()
+      const bet = this.calculateBet()
+      if (this.balance >= bet) {
+        this.updateBalance(-bet)
+        this.blurReels()
+        this.shuffle()
+        for (let i = 0; i < slotConfig.reelsLength; i++) {
+          scene.tweens.add({
+            targets: [this.reels[i].reel],
+            tilePositionY: `+=${(i + 1) * slotConfig.reelSymbolsLength * slotConfig.symbolSize}`,
+            duration: this.reels[i].duration,
+            onComplete: () => {
+              const tilePositionY = this.reels[i].reel.tilePositionY
+              this.reels[i].reel.destroy()
+              this.reels[i].reel = this.add.tileSprite(
+                this.centerSlotX + (i - 1) * slotConfig.reelWidth,
+                this.centerSlotY,
+                slotConfig.symbolSize,
+                slotConfig.symbolSize * slotConfig.visibleSymbolsLength,
+                `reel${i + 1}`
+              )
+              this.reels[i].reel.tilePositionY = tilePositionY
 
-            if (i === slotConfig.reelsLength - 1) {
-              if (this.winAmount > 0) {
-                this.winValue = this.getWinValue()
-                this.updateBalance(this.winAmount)
-                this.message = this.getMessageWin()
-                this.betWinContainer.add([this.message, this.winValue])
-              }
+              if (i === slotConfig.reelsLength - 1) {
+                if (this.winAmount > 0) {
+                  this.winValue = this.getWinValue()
+                  this.updateBalance(this.winAmount)
+                  this.message = this.getMessageWin()
+                  this.betWinContainer.add([this.message, this.winValue])
+                }
 
-              for (let j = 0; j < this.winningLines.length; j++) {
-                this.drawLine(this.winningLines[j])
-              }
+                for (let j = 0; j < this.winningLines.length; j++) {
+                  this.drawLine(this.winningLines[j])
+                }
 
-              if (this.balance === 0) {
-                this.message = this.getMessageLowBalance()
-                this.betWinContainer.add(this.message)
-              }
-
-              if (this.isAutospinEnabled) {
-                this.time.addEvent({
-                  delay: slotConfig.autospinDelayBetweenSpinsMs,
-                  callback: () => this.startSpin(this),
-                  callbackScope: this
-                })
+                if (this.balance === 0) {
+                  this.message = this.getMessageLowBalance()
+                  this.betWinContainer.add(this.message)
+                }
+                this.isSpinning = false
+                if (this.isAutospinEnabled) {
+                  this.time.addEvent({
+                    delay: slotConfig.autospinDelayBetweenSpinsMs,
+                    callback: () => this.startSpin(this),
+                    callbackScope: this
+                  })
+                }
               }
             }
-          }
-        })
+          })
+        }
+      } else {
+        this.message = this.getMessageLowBalance()
+        if (this.winValue) {
+          this.betWinContainer.remove(this.winValue, true)
+        }
+        this.betWinContainer.add(this.message)
       }
-    } else {
-      this.message = this.getMessageLowBalance()
-      if (this.winValue) {
-        this.betWinContainer.remove(this.winValue, true)
-      }
-      this.betWinContainer.add(this.message)
     }
   }
 
