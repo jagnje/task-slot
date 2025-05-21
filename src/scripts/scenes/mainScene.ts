@@ -1,84 +1,14 @@
-import config from '../../config'
+import config, {DEFAULT_WIDTH, slotConfig} from '../../config'
 import Button from '../classes/Button'
 import { GameObjects, Scene, Math } from 'phaser'
-import { convertColorToString, numberWithCommas } from '../functions'
+import { convertColorToString, numberWithCommas, calculateRatio, getScreenSymbols, calculateWinAmountAndLines } from '../functions'
 import { symbolsText, reelsSymbols, paytable, lines } from '../common'
 import { Reel, Line } from '../types'
-
-const reelsDurationBaseMs = 1600
-const reelsDurationGapMs = 700
-const symbolsLength = symbolsText.length
-const reelsLength = 3
-const visibleSymbolsLength = 3
-const symbolSize = 138
-const reelSymbolsLength = reelsSymbols[0].length
-const whiteColor = 0xffffff
-const neonYellowColor = 0xfffa00
-const neonBlueColor = 0x057dff
-const linesColorPalette = [0xff8800, 0xffcc00, 0xb6ff00, 0xffa5, 0x00ddff]
-const neonGreenColor = 0x00ff2e
-const violetColor = 0x220044
-const reelWidth = 180
-const lineWidth = 15
-const frameWidth = 10
-const frameWidthNarrow = 6
-const initialBalance = 100000
-const coinsOptions = [1, 2, 5, 10, 20, 50, 100]
-const linesOptions = [1, 2, 3, 4, 5]
-const autospinDelayBetweenSpinsMs = 1000
-
-function getScreenSymbols(reel: number, newPosition: number): number[] {
-  const prevPosition = newPosition === 0 ? reelSymbolsLength - 1 : newPosition - 1
-  const nextPosition = newPosition === reelSymbolsLength - 1 ? 0 : newPosition + 1
-  const reelSymbolPrev = reelsSymbols[reel][prevPosition]
-  const reelSymbol = reelsSymbols[reel][newPosition]
-  const reelSymbolNext = reelsSymbols[reel][nextPosition]
-  return [reelSymbolPrev, reelSymbol, reelSymbolNext]
-}
-
-function getLineSymbols(reel: Reel[], linesSymbols: number[]): number[] {
-  const symbols = new Array(linesSymbols.length)
-  for (let i = 0; i < linesSymbols.length; i++) {
-    symbols[i] = reel[i].currentScreenSymbol[linesSymbols[i]]
-  }
-  return symbols
-}
-
-function linescalculateWin(reel: Reel[], linesValue: number, coinsValue: number): {winningLines: number[], winAmount: number} {
-  const winningLines: number[] = []
-  let winAmount = 0
-
-  for (let i = 0; i < linesValue; i++) {
-    const line = getLineSymbols(reel, lines[i])
-    let leadingSymbolsInLine = 1
-    const leadingSymbol = line[0]
-    for (let j = 1; j < line.length; j++) {
-      if (line[j] === leadingSymbol) {
-        leadingSymbolsInLine = j + 1
-      } else {
-        break
-      }
-    }
-
-    const lineWinAmount = paytable[leadingSymbol - 1][leadingSymbolsInLine - 1]
-    if (lineWinAmount > 0) {
-      winAmount += lineWinAmount
-      winningLines.push(i)
-    }
-  }
-
-  if (winAmount) {
-    winAmount *= coinsValue
-  }
-
-  return {winAmount, winningLines}
-}
-
 export default class MainScene extends Scene {
   // dimensions
   width = config.scale.width
   height = config.scale.height
-  centerSlotY = this.height / 2 - symbolSize / 2
+  centerSlotY = this.height / 2 - slotConfig.symbolSize / 2
   centerSlotX = this.width / 2
 
   // ui elements
@@ -87,7 +17,7 @@ export default class MainScene extends Scene {
   betWinContainer: GameObjects.Container
   bet: GameObjects.Text
   betValue: GameObjects.Text
-  win: GameObjects.Text
+  message: GameObjects.Text
   winValue: GameObjects.Text
   balanceValue: GameObjects.Text
 
@@ -97,22 +27,28 @@ export default class MainScene extends Scene {
 
   // buttons
   spin: Button
+  
   // right of spin
   info: Button
   maxbet: Button
   autospin: Button
   stop: Button
+  
   // left of spin
+  
   // lines
   plusLines: Button
   minusLines: Button
   linesValue: GameObjects.Text
+  
   // coins
   plusCoins: Button
   minusCoins: Button
   coinsValue: GameObjects.Text
+  
   // reel
   reels: Reel[]
+
   // menu
   menuContainer: GameObjects.Container
   back: Button
@@ -124,13 +60,13 @@ export default class MainScene extends Scene {
   // variables
   linesPosition = 0
   coinsPosition = 0
-  balance = initialBalance
+  balance = slotConfig.initialBalance
   isAutospinEnabled = false
   topContainerHeight: number
   winAmount = 0
   winningLines: number[]
-  outerWidth = reelWidth * reelsLength + frameWidth
-  outerHeight = symbolSize * reelsLength
+  outerWidth = slotConfig.reelWidth * slotConfig.reelsLength + slotConfig.frameWidth
+  outerHeight = slotConfig.symbolSize * slotConfig.reelsLength
 
   constructor() {
     super({ key: 'MainScene' })
@@ -160,52 +96,52 @@ export default class MainScene extends Scene {
     this.add.image(this.centerSlotX, this.height / 2, 'bg')
 
     // frame variables
-    const yOffset = (reelsLength * symbolSize) / 2 + frameWidth / 2
-    const xOffset = (reelsLength * reelWidth) / 2
+    const yOffset = (slotConfig.reelsLength * slotConfig.symbolSize) / 2 + slotConfig.frameWidth / 2
+    const xOffset = (slotConfig.reelsLength * slotConfig.reelWidth) / 2
 
     // frame
-    this.add.rectangle(this.centerSlotX, this.centerSlotY - yOffset, this.outerWidth, frameWidth, neonYellowColor)
-    this.add.rectangle(this.centerSlotX, this.centerSlotY + yOffset, this.outerWidth, frameWidth, neonYellowColor)
-    this.add.rectangle(this.centerSlotX - xOffset, this.centerSlotY, frameWidth, this.outerHeight, neonYellowColor)
-    this.add.rectangle(this.centerSlotX + xOffset, this.centerSlotY, frameWidth, this.outerHeight, neonYellowColor)
+    this.add.rectangle(this.centerSlotX, this.centerSlotY - yOffset, this.outerWidth, slotConfig.frameWidth, slotConfig.neonYellowColor)
+    this.add.rectangle(this.centerSlotX, this.centerSlotY + yOffset, this.outerWidth, slotConfig.frameWidth, slotConfig.neonYellowColor)
+    this.add.rectangle(this.centerSlotX - xOffset, this.centerSlotY, slotConfig.frameWidth, this.outerHeight, slotConfig.neonYellowColor)
+    this.add.rectangle(this.centerSlotX + xOffset, this.centerSlotY, slotConfig.frameWidth, this.outerHeight, slotConfig.neonYellowColor)
 
     // frame inner
     this.add.rectangle(
-      this.centerSlotX - reelWidth / 2,
+      this.centerSlotX - slotConfig.reelWidth / 2,
       this.centerSlotY,
-      frameWidthNarrow,
+      slotConfig.frameWidthNarrow,
       this.outerHeight,
-      neonYellowColor
+      slotConfig.neonYellowColor
     )
     this.add.rectangle(
-      this.centerSlotX + reelWidth / 2,
+      this.centerSlotX + slotConfig.reelWidth / 2,
       this.centerSlotY,
-      frameWidthNarrow,
+      slotConfig.frameWidthNarrow,
       this.outerHeight,
-      neonYellowColor
+      slotConfig.neonYellowColor
     )
 
     // reels backgrounds
-    for (let i = 0; i < reelsLength; i++) {
+    for (let i = 0; i < slotConfig.reelsLength; i++) {
       this.add.rectangle(
-        this.centerSlotX + (i - 1) * reelWidth,
+        this.centerSlotX + (i - 1) * slotConfig.reelWidth,
         this.centerSlotY,
-        reelWidth - frameWidthNarrow,
-        symbolSize * visibleSymbolsLength,
-        violetColor
+        slotConfig.reelWidth - slotConfig.frameWidthNarrow,
+        slotConfig.symbolSize * slotConfig.visibleSymbolsLength,
+        slotConfig.violetColor
       )
     }
 
-    this.topContainerHeight = this.centerSlotY - yOffset - frameWidth / 2
-    const bottomContainerHeight = this.height - this.topContainerHeight - this.outerHeight - frameWidth * 6
+    this.topContainerHeight = this.centerSlotY - yOffset - slotConfig.frameWidth / 2
+    const bottomContainerHeight = this.height - this.topContainerHeight - this.outerHeight - slotConfig.frameWidth * 6
 
     // top container
-    this.topContainer = new GameObjects.Container(this, this.centerSlotX, this.topContainerHeight / 2 - frameWidth / 2)
+    this.topContainer = new GameObjects.Container(this, this.centerSlotX, this.topContainerHeight / 2 - slotConfig.frameWidth / 2)
 
     this.topContainer.add(
       this.add
         .text(-this.outerWidth / 2, 5, 'FRUIT SLOT', {
-          color: convertColorToString(neonYellowColor),
+          color: convertColorToString(slotConfig.neonYellowColor),
           fontSize: '65px',
           fontFamily: 'PlaypenSansDevaBold'
         })
@@ -215,7 +151,7 @@ export default class MainScene extends Scene {
     this.topContainer.add(
       this.add
         .text(this.outerWidth / 2, -10, 'BALANCE', {
-          color: convertColorToString(whiteColor),
+          color: convertColorToString(slotConfig.whiteColor),
           fontSize: '26px',
           fontFamily: 'PlaypenSansDevaBold'
         })
@@ -230,10 +166,10 @@ export default class MainScene extends Scene {
 
     this.spin = new Button(this, 0, 0, 'spinButton', 1, undefined, () => this.startSpin(this))
 
-    this.betWinContainer = new GameObjects.Container(this, this.centerSlotX, this.height - bottomContainerHeight / 0.93)
+    this.betWinContainer = new GameObjects.Container(this, this.centerSlotX, this.height - bottomContainerHeight / 0.92)
     this.bet = this.add
       .text(-this.outerWidth / 2, 0, 'BET', {
-        color: convertColorToString(neonYellowColor),
+        color: convertColorToString(slotConfig.neonYellowColor),
         fontSize: '26px',
         fontFamily: 'PlaypenSansDevaBold'
       })
@@ -246,7 +182,6 @@ export default class MainScene extends Scene {
     this.bottomContainer = new GameObjects.Container(this, this.centerSlotX, this.height - bottomContainerHeight / 2)
 
     // buttons
-
     this.maxbet = new Button(
       this,
       this.spin.width * 0.85,
@@ -299,7 +234,7 @@ export default class MainScene extends Scene {
 
     const linesText = this.add
       .text(-this.outerWidth / 2, this.bottomContainer.height / 2 - this.spin.height / 2, 'LINES', {
-        color: convertColorToString(whiteColor),
+        color: convertColorToString(slotConfig.whiteColor),
         fontSize: '26px',
         fontFamily: 'PlaypenSansDevaBold'
       })
@@ -327,7 +262,7 @@ export default class MainScene extends Scene {
 
     const coinsText = this.add
       .text(-this.outerWidth / 2, -(this.bottomContainer.height / 2 - this.spin.height / 4), 'COINS', {
-        color: convertColorToString(whiteColor),
+        color: convertColorToString(slotConfig.whiteColor),
         fontSize: '26px',
         fontFamily: 'PlaypenSansDevaBold'
       })
@@ -354,30 +289,30 @@ export default class MainScene extends Scene {
     this.add.existing(this.bottomContainer)
 
     // reels
-    this.reels = new Array(reelsLength)
+    this.reels = new Array(slotConfig.reelsLength)
     for (let i = 0; i < this.reels.length; i++) {
       this.reels[i] = {
         reel: this.add.tileSprite(
-          this.centerSlotX + (i - 1) * reelWidth,
+          this.centerSlotX + (i - 1) * slotConfig.reelWidth,
           this.centerSlotY,
-          symbolSize,
-          symbolSize * visibleSymbolsLength,
+          slotConfig.symbolSize,
+          slotConfig.symbolSize * slotConfig.visibleSymbolsLength,
           `reel${i + 1}`
         ),
-        duration: reelsDurationBaseMs + i * reelsDurationGapMs,
-        currentScreenSymbol: new Array(visibleSymbolsLength).fill(null)
+        duration: slotConfig.reelsDurationBaseMs + i * slotConfig.reelsDurationGapMs,
+        currentScreenSymbol: new Array(slotConfig.visibleSymbolsLength).fill(null)
       }
     }
     this.lineContainer = new GameObjects.Container(this, 0, 0)
     this.add.existing(this.lineContainer)
     this.lineContainer.depth = 1
-    this.shuffle(true)
+    this.initializeReels()
   }
 
   createMenu(): GameObjects.Container {
     const menuContainerHeight = this.height - this.topContainerHeight
     const menuContainer = new GameObjects.Container(this, this.centerSlotX, this.height - menuContainerHeight / 2)
-    const rectangle = new GameObjects.Rectangle(this, 0, 0, this.width, menuContainerHeight, violetColor)
+    const rectangle = new GameObjects.Rectangle(this, 0, 0, this.width, menuContainerHeight, slotConfig.violetColor)
 
     this.back = new Button(
       this,
@@ -388,19 +323,26 @@ export default class MainScene extends Scene {
       undefined,
       () => this.hideMenu()
     )
-    const topRectangles = new Array(symbolsLength)
-    const topRectanglesInner = new Array(symbolsLength)
-    const bottomRectangles = new Array(symbolsLength)
-    const bottomRectanglesInner = new Array(symbolsLength)
-    const symbols = new Array(symbolsLength)
-    const symbolsTextTopLeft = new Array(symbolsLength)
-    const symbolsTextTopRight = new Array(symbolsLength)
-    const symbolsTextBottomLeft = new Array(symbolsLength)
-    const symbolsTextBottomRight = new Array(symbolsLength)
+    const topRectangles = new Array(slotConfig.symbolsLength)
+    const topRectanglesInner = new Array(slotConfig.symbolsLength)
+    const bottomRectangles = new Array(slotConfig.symbolsLength)
+    const bottomRectanglesInner = new Array(slotConfig.symbolsLength)
+    const symbols = new Array(slotConfig.symbolsLength)
+    const symbolsTextTopLeft = new Array(slotConfig.symbolsLength)
+    const symbolsTextTopRight = new Array(slotConfig.symbolsLength)
+    const symbolsTextBottomLeft = new Array(slotConfig.symbolsLength)
+    const symbolsTextBottomRight = new Array(slotConfig.symbolsLength)
+
+    let innerWidth = window.innerWidth
+    if (innerWidth > DEFAULT_WIDTH) {
+      innerWidth = DEFAULT_WIDTH
+    }
+
+    const ratio = calculateRatio(innerWidth, DEFAULT_WIDTH)
 
     const paytableText = this.add
       .text(0, -this.height / 2.6, 'PAY TABLE', {
-        color: convertColorToString(neonBlueColor),
+        color: convertColorToString(slotConfig.neonBlueColor),
         fontSize: '50px',
         fontFamily: 'PlaypenSansDevaBold'
       })
@@ -408,31 +350,31 @@ export default class MainScene extends Scene {
 
     const linesText = this.add
       .text(0, this.height / 10, 'LINES', {
-        color: convertColorToString(neonBlueColor),
+        color: convertColorToString(slotConfig.neonBlueColor),
         fontSize: '40px',
         fontFamily: 'PlaypenSansDevaBold'
       })
       .setOrigin(0.5, 0.5)
 
-    const linesTextTop = new Array(symbolsLength)
+    const linesTextTop = new Array(slotConfig.symbolsLength)
 
-    const linesRectangles: GameObjects.Rectangle[] = [] // new Array(symbolsLength * visibleSymbolsLength * reelsLength)
-    const size = this.height / 21
-    for (let i = 0; i < symbolsLength; i++) {
-      for (let j = 0; j < reelsLength; j++) {
-        const x = ((i - 2) * this.width) / 5 + (j - 1) * 40
-        for (let k = 0; k < visibleSymbolsLength; k++) {
-          const y = this.height / 3.9 + k * 40
+    const linesRectangles: GameObjects.Rectangle[] = []
+    const size = this.height / 21 * ratio
+    for (let i = 0; i < slotConfig.symbolsLength; i++) {
+      for (let j = 0; j < slotConfig.reelsLength; j++) {
+        const x = ((i - 2) * this.width) / 5 + (j - 1) * 40 * ratio
+        for (let k = 0; k < slotConfig.visibleSymbolsLength; k++) {
+          const y = this.height / 3.9 + k * 40 * ratio
           linesRectangles.push(
-            new GameObjects.Rectangle(this, x, y, size, size, lines[i][j] === k ? linesColorPalette[i] : whiteColor)
+            new GameObjects.Rectangle(this, x, y, size, size, lines[i][j] === k ? slotConfig.linesColorPalette[i] :slotConfig.whiteColor)
           )
         }
       }
 
       linesTextTop[i] = this.add
-        .text(((i - 2) * this.width) / 5, +this.height / 5, `Line ${i + 1}`, {
-          color: convertColorToString(neonYellowColor),
-          fontSize: '40px',
+        .text(((i - 2) * this.width) / 5, +this.height / 5, `LINE ${i + 1}`, {
+          color: convertColorToString(slotConfig.neonYellowColor),
+          fontSize: `${ratio * 40}px`,
           fontFamily: 'PlaypenSansDevaBold'
         })
         .setOrigin(0.5, 0.5)
@@ -441,49 +383,49 @@ export default class MainScene extends Scene {
         this,
         ((i - 2) * this.width) / 5,
         -this.height / 7,
-        this.width / 6,
+        this.width / 5.3,
         this.height / 2.8,
-        neonBlueColor
+        slotConfig.neonBlueColor
       )
 
       topRectanglesInner[i] = new GameObjects.Rectangle(
         this,
         ((i - 2) * this.width) / 5,
         -this.height / 7,
-        this.width / 6 - 10,
+        this.width / 5.3 - 10,
         this.height / 2.8 - 10,
-        violetColor
+        slotConfig.violetColor
       )
 
-      symbols[i] = this.add.image(((i - 2) * this.width) / 5, -this.height / 4.5, 'symbolsAtlas', `s${i + 1}.png`)
+      symbols[i] = this.add.image(((i - 2) * this.width) / 5, -this.height / 4.5, 'symbolsAtlas', `s${i + 1}.png`).setScale(ratio)
       symbolsTextTopLeft[i] = this.add
-        .text(((i - 2) * this.width) / 5 - this.width / 12 / 2, -this.height / 10, '3:', {
-          color: convertColorToString(neonYellowColor),
-          fontSize: '50px',
+        .text(((i - 2) * this.width) / 5 - this.width / 10 / 2, -this.height / 10, '3:', {
+          color: convertColorToString(slotConfig.neonYellowColor),
+          fontSize: `${ratio * 50}px`,
           fontFamily: 'PlaypenSansDevaBold'
         })
         .setOrigin(0.5, 0.5)
 
       symbolsTextTopRight[i] = this.add
         .text(((i - 2) * this.width) / 5 + this.width / 16 / 2, -this.height / 10, paytable[i][2].toString(), {
-          color: convertColorToString(whiteColor),
-          fontSize: '50px',
+          color: convertColorToString(slotConfig.whiteColor),
+          fontSize: `${ratio * 40}px`,
           fontFamily: 'PlaypenSansDevaBold'
         })
         .setOrigin(0.5, 0.5)
 
       symbolsTextBottomLeft[i] = this.add
-        .text(((i - 2) * this.width) / 5 - this.width / 12 / 2, -this.height / 40, '2:', {
-          color: convertColorToString(neonYellowColor),
-          fontSize: '50px',
+        .text(((i - 2) * this.width) / 5 - this.width / 10 / 2, -this.height / 40, '2:', {
+          color: convertColorToString(slotConfig.neonYellowColor),
+          fontSize: `${ratio * 50}px`,
           fontFamily: 'PlaypenSansDevaBold'
         })
         .setOrigin(0.5, 0.5)
 
       symbolsTextBottomRight[i] = this.add
         .text(((i - 2) * this.width) / 5 + this.width / 14 / 2, -this.height / 40, paytable[i][1].toString(), {
-          color: convertColorToString(whiteColor),
-          fontSize: '50px',
+          color: convertColorToString(slotConfig.whiteColor),
+          fontSize: `${ratio * 40}px`,
           fontFamily: 'PlaypenSansDevaBold'
         })
         .setOrigin(0.5, 0.5)
@@ -492,18 +434,18 @@ export default class MainScene extends Scene {
         this,
         ((i - 2) * this.width) / 5,
         +this.height / 3.5,
-        this.width / 6,
+        this.width / 5.3,
         this.height / 4,
-        neonBlueColor
+        slotConfig.neonBlueColor
       )
 
       bottomRectanglesInner[i] = new GameObjects.Rectangle(
         this,
         ((i - 2) * this.width) / 5,
         +this.height / 3.5,
-        this.width / 6 - 10,
+        this.width / 5.3 - 10,
         this.height / 4 - 10,
-        violetColor
+        slotConfig.violetColor
       )
     }
 
@@ -526,29 +468,30 @@ export default class MainScene extends Scene {
       ...symbolsTextBottomRight,
       ...linesTextTop
     ])
+    menuContainer.depth = 2
     return menuContainer
   }
 
   drawLine(line: number) {
-    const color = linesColorPalette[line]
+    const color = slotConfig.linesColorPalette[line]
     switch (line) {
       case 0:
         this.lines.rectangle1 = this.add
-          .rectangle(this.centerSlotX, this.topContainerHeight + (symbolSize / 2) * 3.2, this.outerWidth, lineWidth, color)
+          .rectangle(this.centerSlotX, this.topContainerHeight + (slotConfig.symbolSize / 2) * 3.2, this.outerWidth, slotConfig.lineWidth, color)
           .setOrigin(0.5, 0)
         this.lineContainer.add(this.lines.rectangle1)
       break;
 
       case 1:
         this.lines.rectangle2 = this.add
-          .rectangle(this.centerSlotX, this.topContainerHeight + (symbolSize / 2) * 1.2, this.outerWidth, lineWidth, color)
+          .rectangle(this.centerSlotX, this.topContainerHeight + (slotConfig.symbolSize / 2) * 1.2, this.outerWidth, slotConfig.lineWidth, color)
           .setOrigin(0.5, 0)
         this.lineContainer.add(this.lines.rectangle2)
       break;
 
       case 2:
         this.lines.rectangle3 = this.add
-          .rectangle(this.centerSlotX, this.topContainerHeight + (symbolSize / 2) * 5.2, this.outerWidth, lineWidth, color)
+          .rectangle(this.centerSlotX, this.topContainerHeight + (slotConfig.symbolSize / 2) * 5.2, this.outerWidth, slotConfig.lineWidth, color)
           .setOrigin(0.5, 0)
 
         this.lineContainer.add(this.lines.rectangle3)
@@ -562,9 +505,9 @@ export default class MainScene extends Scene {
             0,
             0,
             this.outerWidth,
-            this.outerHeight,
+            this.outerHeight + slotConfig.frameWidth / 2,
             this.outerWidth,
-            this.outerHeight + lineWidth,
+            this.outerHeight + slotConfig.frameWidth / 2 + slotConfig.lineWidth,
             color
           )
           .setOrigin(0.5, 0.5)
@@ -576,9 +519,9 @@ export default class MainScene extends Scene {
             0,
             0,
             0,
-            lineWidth,
+            slotConfig.lineWidth,
             this.outerWidth,
-            this.outerHeight + lineWidth,
+            this.outerHeight + slotConfig.frameWidth / 2 + slotConfig.lineWidth,
             color
           )
           .setOrigin(0.5, 0.5)
@@ -595,9 +538,9 @@ export default class MainScene extends Scene {
             this.outerWidth,
             0,
             0,
-            this.outerHeight,
+            this.outerHeight + slotConfig.frameWidth / 2,
             0,
-            this.outerHeight + lineWidth,
+            this.outerHeight + slotConfig.frameWidth / 2 + slotConfig.lineWidth,
             color
           )
           .setOrigin(0.5, 0.5)
@@ -609,9 +552,9 @@ export default class MainScene extends Scene {
             this.outerWidth,
             0,
             this.outerWidth,
-            lineWidth,
+            slotConfig.lineWidth,
             0,
-            this.outerHeight + lineWidth,
+            this.outerHeight + slotConfig.frameWidth / 2 + slotConfig.lineWidth,
             color
           )
           .setOrigin(0.5, 0.5)
@@ -703,8 +646,8 @@ export default class MainScene extends Scene {
 
   changeLinesValue(forward?: boolean, maxBet?: boolean) {
     this.linesPosition = maxBet
-      ? linesOptions.length - 1
-      : this.getNewPosition(this.linesPosition, linesOptions, forward)
+      ? slotConfig.linesOptions.length - 1
+      : this.getNewPosition(this.linesPosition, slotConfig.linesOptions, forward)
     this.bottomContainer.remove(this.linesValue, true)
     this.linesValue = this.getLinesValue()
     this.bottomContainer.add(this.linesValue)
@@ -713,8 +656,8 @@ export default class MainScene extends Scene {
 
   changeCoinsValue(forward?: boolean, maxBet?: boolean) {
     this.coinsPosition = maxBet
-      ? coinsOptions.length - 1
-      : this.getNewPosition(this.coinsPosition, coinsOptions, forward)
+      ? slotConfig.coinsOptions.length - 1
+      : this.getNewPosition(this.coinsPosition, slotConfig.coinsOptions, forward)
     this.bottomContainer.remove(this.coinsValue, true)
     this.coinsValue = this.getCoinsValue()
     this.bottomContainer.add(this.coinsValue)
@@ -725,12 +668,19 @@ export default class MainScene extends Scene {
     this.betWinContainer.remove(this.betValue, true)
     this.betValue = this.getBetValue()
     this.betWinContainer.add(this.betValue)
+
+    if (this.winValue) {
+      this.betWinContainer.remove(this.winValue, true)
+    }
+    if (this.message) {
+      this.betWinContainer.remove(this.message, true)
+    }
   }
 
   getLinesValue(): GameObjects.Text {
     return this.add
-      .text(-this.spin.width / 1.2, -this.spin.height / 3.5, linesOptions[this.linesPosition].toString(), {
-        color: convertColorToString(whiteColor),
+      .text(-this.spin.width / 1.2, -this.spin.height / 3.5, slotConfig.linesOptions[this.linesPosition].toString(), {
+        color: convertColorToString(slotConfig.whiteColor),
         fontSize: '45px',
         fontFamily: 'PlaypenSansDevaBold'
       })
@@ -739,8 +689,8 @@ export default class MainScene extends Scene {
 
   getCoinsValue(): GameObjects.Text {
     return this.add
-      .text(-this.spin.width / 1.2, +this.spin.height / 4.2, coinsOptions[this.coinsPosition].toString(), {
-        color: convertColorToString(whiteColor),
+      .text(-this.spin.width / 1.2, +this.spin.height / 4.2, slotConfig.coinsOptions[this.coinsPosition].toString(), {
+        color: convertColorToString(slotConfig.whiteColor),
         fontSize: '45px',
         fontFamily: 'PlaypenSansDevaBold'
       })
@@ -748,33 +698,43 @@ export default class MainScene extends Scene {
   }
 
   calculateBet(): number {
-    return linesOptions[this.linesPosition] * coinsOptions[this.coinsPosition]
+    return slotConfig.linesOptions[this.linesPosition] * slotConfig.coinsOptions[this.coinsPosition]
   }
 
   getBetValue(): GameObjects.Text {
     return this.add
       .text(-this.spin.width / 1.2, 0, this.calculateBet().toString(), {
-        color: convertColorToString(neonYellowColor),
+        color: convertColorToString(slotConfig.neonYellowColor),
         fontSize: '40px',
         fontFamily: 'PlaypenSansDevaBold'
       })
       .setOrigin(0.5, 0.5)
   }
 
-  getWin() {
+  getMessageWin() {
     return this.add
-      .text(0, 0, `WIN!!!`, {
-        color: convertColorToString(neonGreenColor),
+      .text(0, 0, 'WIN!!!', {
+        color: convertColorToString(slotConfig.neonGreenColor),
         fontSize: '50px',
         fontFamily: 'PlaypenSansDevaBold'
       })
       .setOrigin(0.5, 0.5)
   }
 
+  getMessageLowBalance() {
+    return this.add
+      .text(this.outerWidth / 2, 0, this.balance === 0 ? 'OUT OF AVAILABLE FUNDS!' : 'BALANCE TOO LOW!', {
+        color: convertColorToString(slotConfig.neonRedColor),
+        fontSize: this.balance === 0 ? '24px' : '30px',
+        fontFamily: 'PlaypenSansDevaBold'
+      })
+      .setOrigin(1, 0.5)
+  }
+
   getWinValue(): GameObjects.Text {
     return this.add
       .text(this.outerWidth / 2, 0, `${numberWithCommas(this.winAmount)} $`, {
-        color: convertColorToString(neonGreenColor),
+        color: convertColorToString(slotConfig.neonGreenColor),
         fontSize: '40px',
         fontFamily: 'PlaypenSansDevaBold'
       })
@@ -791,7 +751,7 @@ export default class MainScene extends Scene {
   getBalanceValue(): GameObjects.Text {
     return this.add
       .text(this.outerWidth / 2, 20, `${numberWithCommas(this.balance)}$`, {
-        color: convertColorToString(whiteColor),
+        color: convertColorToString(slotConfig.whiteColor),
         fontSize: '26px',
         fontFamily: 'PlaypenSansDevaBold'
       })
@@ -800,89 +760,104 @@ export default class MainScene extends Scene {
 
   startSpin(scene: Scene) {
     this.removeAllLines()
-    this.updateBalance(-this.calculateBet())
-    this.blurReels()
-    this.shuffle()
-    for (let i = 0; i < reelsLength; i++) {
-      scene.tweens.add({
-        targets: [this.reels[i].reel],
-        tilePositionY: `+=${(i + 1) * reelSymbolsLength * symbolSize}`,
-        duration: this.reels[i].duration,
-        onComplete: () => {
-          const tilePositionY = this.reels[i].reel.tilePositionY
-          this.reels[i].reel.destroy()
-          this.reels[i].reel = this.add.tileSprite(
-            this.centerSlotX + (i - 1) * reelWidth,
-            this.centerSlotY,
-            symbolSize,
-            symbolSize * visibleSymbolsLength,
-            `reel${i + 1}`
-          )
-          this.reels[i].reel.tilePositionY = tilePositionY
+    const bet = this.calculateBet()
+    if (this.balance >= bet) {
+      this.updateBalance(-bet)
+      this.blurReels()
+      this.shuffle()
+      for (let i = 0; i < slotConfig.reelsLength; i++) {
+        scene.tweens.add({
+          targets: [this.reels[i].reel],
+          tilePositionY: `+=${(i + 1) * slotConfig.reelSymbolsLength * slotConfig.symbolSize}`,
+          duration: this.reels[i].duration,
+          onComplete: () => {
+            const tilePositionY = this.reels[i].reel.tilePositionY
+            this.reels[i].reel.destroy()
+            this.reels[i].reel = this.add.tileSprite(
+              this.centerSlotX + (i - 1) * slotConfig.reelWidth,
+              this.centerSlotY,
+              slotConfig.symbolSize,
+              slotConfig.symbolSize * slotConfig.visibleSymbolsLength,
+              `reel${i + 1}`
+            )
+            this.reels[i].reel.tilePositionY = tilePositionY
 
-          if (i === reelsLength - 1) {
-            if (this.winAmount > 0) {
-              this.winValue = this.getWinValue()
-              this.updateBalance(this.winAmount)
-              this.win = this.getWin()
-              this.betWinContainer.add([this.win, this.winValue])
-            }
+            if (i === slotConfig.reelsLength - 1) {
+              if (this.winAmount > 0) {
+                this.winValue = this.getWinValue()
+                this.updateBalance(this.winAmount)
+                this.message = this.getMessageWin()
+                this.betWinContainer.add([this.message, this.winValue])
+              }
 
-            for (let j = 0; j < this.winningLines.length; j++) {
-              this.drawLine(this.winningLines[j])
-            }
+              for (let j = 0; j < this.winningLines.length; j++) {
+                this.drawLine(this.winningLines[j])
+              }
 
-            if (this.isAutospinEnabled) {
-              this.time.addEvent({
-                delay: autospinDelayBetweenSpinsMs,
-                callback: () => this.startSpin(this),
-                callbackScope: this
-              })
+              if (this.balance === 0) {
+                this.message = this.getMessageLowBalance()
+                this.betWinContainer.add(this.message)
+              }
+
+              if (this.isAutospinEnabled) {
+                this.time.addEvent({
+                  delay: slotConfig.autospinDelayBetweenSpinsMs,
+                  callback: () => this.startSpin(this),
+                  callbackScope: this
+                })
+              }
             }
           }
-        }
-      })
-    }
-  }
-
-  shuffle(initialize?: boolean) {
-    for (let i = 0; i < reelsLength; i++) {
-      if (initialize) {
-        this.reels[i].reel.tilePositionY = 0
-      } else {
-        const newReelPosition = Math.Between(0, reelSymbolsLength - 1)
-        this.reels[i].reel.tilePositionY = (newReelPosition - 1) * symbolSize
-        this.reels[i].currentScreenSymbol = getScreenSymbols(i, newReelPosition)
+        })
       }
-    }
-    if (!initialize) {
-      if (this.win) {
-        this.betWinContainer.remove(this.win, true)
-      }
-
+    } else {
+      this.message = this.getMessageLowBalance()
       if (this.winValue) {
         this.betWinContainer.remove(this.winValue, true)
       }
-
-      const {winAmount, winningLines} = linescalculateWin(
-        this.reels,
-        linesOptions[this.linesPosition],
-        coinsOptions[this.coinsPosition]
-      )
-
-      this.winAmount = winAmount;
-      this.winningLines = winningLines
+      this.betWinContainer.add(this.message)
     }
   }
 
+  initializeReels() {
+    for (let i = 0; i < slotConfig.reelsLength; i++) {
+        this.reels[i].reel.tilePositionY = 0
+    }
+  }
+
+  shuffle() {
+    for (let i = 0; i < slotConfig.reelsLength; i++) {
+        const newReelPosition = Math.Between(0, slotConfig.reelSymbolsLength - 1)
+        this.reels[i].reel.tilePositionY = (newReelPosition - 1) * slotConfig.symbolSize
+        this.reels[i].currentScreenSymbol = getScreenSymbols(i, newReelPosition, slotConfig.reelSymbolsLength)
+    }
+
+    if (this.message) {
+      this.betWinContainer.remove(this.message, true)
+    }
+
+    if (this.winValue) {
+      this.betWinContainer.remove(this.winValue, true)
+    }
+
+    const {winAmount, winningLines} = calculateWinAmountAndLines(
+      this.reels,
+      slotConfig.linesOptions[this.linesPosition],
+      slotConfig.coinsOptions[this.coinsPosition]
+    )
+
+    this.winAmount = winAmount;
+    this.winningLines = winningLines
+  }
+
   blurReels() {
-    for (let i = 0; i < reelsLength; i++) {
+    for (let i = 0; i < slotConfig.reelsLength; i++) {
       this.reels[i].reel.destroy()
       this.reels[i].reel = this.add.tileSprite(
-        this.centerSlotX + (i - 1) * reelWidth,
+        this.centerSlotX + (i - 1) * slotConfig.reelWidth,
         this.centerSlotY,
-        symbolSize,
-        symbolSize * visibleSymbolsLength,
+        slotConfig.symbolSize,
+        slotConfig.symbolSize * slotConfig.visibleSymbolsLength,
         `reel${i + 1}blurred`
       )
     }
