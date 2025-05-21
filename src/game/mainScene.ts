@@ -1029,9 +1029,6 @@ export default class MainScene extends Scene {
                           onUpdate: tween => {
                             this.winValue.setFontSize(30 + tween.getValue() * 80)
                           },
-                          onComplete: () => {
-                            this.isSpinning = false
-                          },
                           repeat: 1
                         }),
                       callbackScope: this
@@ -1047,6 +1044,14 @@ export default class MainScene extends Scene {
                     },
                     onComplete: () => {
                       this.isSpinning = false
+
+                      if (this.isAutospinEnabled) {
+                        this.time.addEvent({
+                          delay: slotConfig.autospinDelayBetweenSpinsMs,
+                          callback: () => this.startSpin(),
+                          callbackScope: this
+                        })
+                      }
                     },
                     repeat: 2
                   })
@@ -1057,19 +1062,19 @@ export default class MainScene extends Scene {
                   }
                 } else {
                   this.isSpinning = false
+
+                  if (this.isAutospinEnabled) {
+                    this.time.addEvent({
+                      delay: slotConfig.autospinDelayBetweenSpinsMs,
+                      callback: () => this.startSpin(),
+                      callbackScope: this
+                    })
+                  }
                 }
 
                 if (this.balance === 0) {
                   this.message = this.getMessageLowBalance()
                   this.betWinContainer.add(this.message)
-                }
-
-                if (this.isAutospinEnabled) {
-                  this.time.addEvent({
-                    delay: slotConfig.autospinDelayBetweenSpinsMs,
-                    callback: () => this.startSpin(),
-                    callbackScope: this
-                  })
                 }
               }
             }
