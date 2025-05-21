@@ -959,7 +959,7 @@ export default class MainScene extends Scene {
 
   getWinValue(): GameObjects.Text {
     return this.add
-      .text(this.outerWidth / 2, 0, `${numberWithCommas(this.winAmount)} $`, {
+      .text(this.outerWidth / 2 - 5, 0, `${numberWithCommas(this.winAmount)} $`, {
         color: convertColorToString(slotConfig.neonGreenColor),
         fontSize: '30px',
         fontFamily: 'PlaypenSansDevaBold'
