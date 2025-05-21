@@ -16,7 +16,7 @@ export function numberWithCommas(x: number): string {
 }
 
 export function calculateRatio(x: number, y: number) {
-  return Math.pow(x/y,0.4)
+  return Math.pow(x/y,0.6)
 }
 
 export function getScreenSymbols(reel: number, newPosition: number, reelSymbolsLength: number): number[] {

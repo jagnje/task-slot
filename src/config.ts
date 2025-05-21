@@ -3,7 +3,7 @@ import { paytable, reelsSymbols } from './game/common'
 import MainScene from './game/mainScene'
 
 export const DEFAULT_WIDTH = 1080
-const DEFAULT_MOBILE_WIDTH = 460
+const DEFAULT_MOBILE_WIDTH = 405
 const DEFAULT_HEIGHT = 720
 const isMobile = window.innerWidth < 768
 const isPortrait = window.matchMedia('(orientation: portrait)').matches
@@ -53,6 +53,7 @@ interface SlotConfig {
   coinsOptions: number[],
   linesOptions: number[],
   autospinDelayBetweenSpinsMs: number
+  rotationSpeed: number
 }
 
 export const slotConfig: SlotConfig = {
@@ -73,12 +74,13 @@ export const slotConfig: SlotConfig = {
   neonRedColor: 0xff1900,
   neonGreenColor: 0x00ff2e,
   violetColor: 0x220044,
-  reelWidth: 150,
+  reelWidth: 132,
   lineWidth: 15,
   frameWidth: 10,
   frameWidthNarrow: 6,
   initialBalance: 100000,
-  coinsOptions: [1, 2, 5, 10, 20, 50, 100],
+  coinsOptions: [1, 2, 5, 10, 20, 50],
   linesOptions: [1, 2, 3, 4, 5],
-  autospinDelayBetweenSpinsMs: 2000
+  autospinDelayBetweenSpinsMs: 2000,
+  rotationSpeed: 0.1
 }

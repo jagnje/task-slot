@@ -1,6 +1,6 @@
 import config, { DEFAULT_WIDTH, slotConfig } from '../config'
 import Button from './Button'
-import { GameObjects, Scene, Math } from 'phaser'
+import { GameObjects, Scene } from 'phaser'
 import {
   convertColorToString,
   numberWithCommas,
@@ -15,7 +15,8 @@ export default class MainScene extends Scene {
   width = config.scale.width
   height = config.scale.height
   centerSlotY = this.height / 2 - slotConfig.symbolSize / 2
-  centerSlotX = slotConfig.isMobile && slotConfig.orientation === 'portrait' ? this.width / 2 : this.width / 3
+  isMobilePortrait = slotConfig.isMobile && slotConfig.orientation === 'portrait'
+  centerSlotX = this.isMobilePortrait ? this.width / 2 : this.width / 3
 
   // ui elements
   topContainer: GameObjects.Container
@@ -32,8 +33,7 @@ export default class MainScene extends Scene {
   lines: Line
 
   // buttons
-  spin: Button | GameObjects.Image
-  spinBig: Button
+  spin: Button
 
   // right of spin
   info: Button
@@ -62,6 +62,7 @@ export default class MainScene extends Scene {
 
   // scaling
   smallScale = 0.6
+  smallerScale = 0.5
   smallestScale = 0.35
 
   // variables
@@ -75,6 +76,7 @@ export default class MainScene extends Scene {
   outerWidth = slotConfig.reelWidth * slotConfig.reelsLength + slotConfig.frameWidth
   outerHeight = slotConfig.symbolSize * slotConfig.reelsLength
   isSpinning = false
+  isSpinningReel = false
 
   constructor() {
     super({ key: 'MainScene' })
@@ -85,8 +87,6 @@ export default class MainScene extends Scene {
     this.load.image('backButton', 'assets/img/back.png')
     this.load.atlas('plusMinusAtlas', 'assets/img/plusminus.png', 'assets/img/plusminus.json')
     this.load.image('spinButton', 'assets/img/spin.png')
-    this.load.image('spinBigButton', 'assets/img/spinbig.png')
-    this.load.image('lemon', 'assets/img/lemon.png')
     this.load.image('maxbetButton', 'assets/img/maxbet.png')
     this.load.image('autospinButton', 'assets/img/autospin.png')
     this.load.image('infoButton', 'assets/img/info.png')
@@ -104,6 +104,8 @@ export default class MainScene extends Scene {
     this.lines = {}
 
     this.add.image(this.width / 2, this.height / 2, 'bg')
+
+    this.add.rectangle(this.centerSlotX, this.topContainerHeight / 2, outerWidth, this.topContainerHeight, slotConfig.neonGreenColor)
 
     // frame variables
     const yOffset = (slotConfig.reelsLength * slotConfig.symbolSize) / 2 + slotConfig.frameWidth / 2
@@ -178,7 +180,7 @@ export default class MainScene extends Scene {
 
     this.topContainer.add(
       this.add
-        .text(-this.outerWidth / 2, 5, 'FRUITIES', {
+        .text(-this.outerWidth / 2, 5, 'FRUITS', {
           color: convertColorToString(slotConfig.neonYellowColor),
           fontSize: '65px',
           fontFamily: 'PlaypenSansDevaBold'
@@ -202,21 +204,7 @@ export default class MainScene extends Scene {
 
     this.add.existing(this.topContainer)
 
-    if (slotConfig.isMobile && slotConfig.orientation === 'portrait') {
-      this.spin = new Button(this, 0, 0, 'spinButton', 1, undefined, () => this.startSpin())
-    } else {
-      this.spin = new GameObjects.Sprite(this, 0, 0, 'lemon').setScale(1.5)
-      this.spinBig = new Button(
-        this,
-        this.centerSlotX + this.outerWidth,
-        this.centerSlotY,
-        'spinBigButton',
-        1,
-        undefined,
-        () => this.startSpin()
-      )
-      this.add.existing(this.spinBig)
-    }
+    this.spin = new Button(this, 0, 0, 'spinButton', 1, undefined, () => this.startSpin())
 
     this.betWinContainer = new GameObjects.Container(this, this.centerSlotX, this.height - bottomContainerHeight / 0.92)
     this.bet = this.add
@@ -236,30 +224,30 @@ export default class MainScene extends Scene {
     // buttons
     this.maxbet = new Button(
       this,
-      slotConfig.spinButtonSize * 0.72,
+      slotConfig.spinButtonSize * (this.isMobilePortrait ? 0.7 : 0.72),
       -slotConfig.spinButtonSize / 4,
       'maxbetButton',
-      this.smallScale,
+      this.isMobilePortrait ? this.smallerScale : this.smallScale,
       undefined,
       () => this.setMaxBet()
     )
 
     this.autospin = new Button(
       this,
-      slotConfig.spinButtonSize * 0.72,
+      slotConfig.spinButtonSize * (this.isMobilePortrait ? 0.7 : 0.72),
       slotConfig.spinButtonSize / 4,
       'autospinButton',
-      this.smallScale,
+      this.isMobilePortrait ? this.smallerScale : this.smallScale,
       undefined,
       () => this.setIsAutospinEnabled(true)
     )
 
     this.info = new Button(
       this,
-      slotConfig.spinButtonSize * 1.22,
+      slotConfig.spinButtonSize * (this.isMobilePortrait ? 1.1 : 1.22),
       -slotConfig.spinButtonSize / 4,
       'infoButton',
-      this.smallScale,
+      this.isMobilePortrait ? this.smallerScale : this.smallScale,
       undefined,
       () => this.showMenu()
     )
@@ -357,7 +345,7 @@ export default class MainScene extends Scene {
     }
     this.linesContainer = new GameObjects.Container(this, 0, 0)
 
-    if (!(slotConfig.isMobile && slotConfig.orientation === 'portrait')) {
+    if (!this.isMobilePortrait) {
       this.drawLineNumbers()
     }
 
@@ -367,6 +355,18 @@ export default class MainScene extends Scene {
     this.initializeReels()
   }
 
+  update() {
+    if (this.isSpinningReel) {
+      this.spin.rotation += slotConfig.rotationSpeed
+    } else {
+      if (this.spin.rotation !== 0) {
+        this.spin.rotation += slotConfig.rotationSpeed
+        if (Math.abs(this.spin.rotation) < 0.2) {
+          this.spin.rotation = 0
+        }
+      }
+    }
+  }
   createMenu(): GameObjects.Container {
     const menuContainerHeight = this.height - this.topContainerHeight
     const menuContainer = new GameObjects.Container(this, this.width / 2, this.height - menuContainerHeight / 2)
@@ -754,10 +754,10 @@ export default class MainScene extends Scene {
   getStopButton(): Button {
     return (this.info = new Button(
       this,
-      slotConfig.spinButtonSize * 1.22,
+      slotConfig.spinButtonSize * (this.isMobilePortrait ? 1.1 : 1.22),
       slotConfig.spinButtonSize / 4,
       'stopButton',
-      this.smallScale,
+      this.isMobilePortrait ? this.smallerScale : this.smallScale,
       undefined,
       () => this.setIsAutospinEnabled(false)
     ))
@@ -827,7 +827,7 @@ export default class MainScene extends Scene {
   getLinesValue(): GameObjects.Text {
     return this.add
       .text(
-        -slotConfig.spinButtonSize / 1.5,
+        -slotConfig.spinButtonSize / 1.65,
         -slotConfig.spinButtonSize / 3.5,
         slotConfig.linesOptions[this.linesPosition].toString(),
         {
@@ -842,7 +842,7 @@ export default class MainScene extends Scene {
   getCoinsValue(): GameObjects.Text {
     return this.add
       .text(
-        -slotConfig.spinButtonSize / 1.5,
+        -slotConfig.spinButtonSize / 1.65,
         +slotConfig.spinButtonSize / 4.2,
         slotConfig.coinsOptions[this.coinsPosition].toString(),
         {
@@ -870,7 +870,7 @@ export default class MainScene extends Scene {
 
   getMessageWin() {
     return this.add
-      .text(0, 0, 'WIN!!!', {
+      .text(0, 0, 'WIN!', {
         color: convertColorToString(slotConfig.neonGreenColor),
         fontSize: '40px',
         fontFamily: 'PlaypenSansDevaBold'
@@ -918,6 +918,7 @@ export default class MainScene extends Scene {
   startSpin() {
     if (!this.isSpinning) {
       this.isSpinning = true
+      this.isSpinningReel = true
       this.removeAllLines()
       const bet = this.calculateBet()
       if (this.balance >= bet) {
@@ -942,6 +943,7 @@ export default class MainScene extends Scene {
               this.reels[i].reel.tilePositionY = tilePositionY
 
               if (i === slotConfig.reelsLength - 1) {
+                this.isSpinningReel = false
                 if (this.winAmount > 0) {
                   this.winValue = this.getWinValue()
                   this.updateBalance(this.winAmount)
@@ -950,24 +952,30 @@ export default class MainScene extends Scene {
                   this.tweens.addCounter({
                       from: 0,
                       to: 1,
-                      duration: 2000,
+                      duration: 500,
                       yoyo: true,
                       onUpdate: (tween) => {
                           this.message.setFontSize(40 + tween.getValue() * 64);
-                      }
+                      },
+                      onComplete: () => {
+                        this.isSpinning = false
+                      },
+                      repeat: 1
                   });                  
                   this.betWinContainer.add([this.message, this.winValue])
-                }
 
-                for (let j = 0; j < this.winningLines.length; j++) {
-                  this.drawLine(this.winningLines[j])
+                  for (let j = 0; j < this.winningLines.length; j++) {
+                    this.drawLine(this.winningLines[j])
+                  }
+                } else {
+                  this.isSpinning = false
                 }
 
                 if (this.balance === 0) {
                   this.message = this.getMessageLowBalance()
                   this.betWinContainer.add(this.message)
                 }
-                this.isSpinning = false
+                
                 if (this.isAutospinEnabled) {
                   this.time.addEvent({
                     delay: slotConfig.autospinDelayBetweenSpinsMs,
@@ -997,7 +1005,7 @@ export default class MainScene extends Scene {
 
   shuffle() {
     for (let i = 0; i < slotConfig.reelsLength; i++) {
-      const newReelPosition = Math.Between(0, slotConfig.reelSymbolsLength - 1)
+      const newReelPosition = Phaser.Math.Between(0, slotConfig.reelSymbolsLength - 1)
       this.reels[i].reel.tilePositionY = (newReelPosition - 1) * slotConfig.symbolSize
       this.reels[i].currentScreenSymbol = getScreenSymbols(i, newReelPosition, slotConfig.reelSymbolsLength)
     }
