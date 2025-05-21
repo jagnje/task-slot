@@ -103,9 +103,7 @@ export default class MainScene extends Scene {
   create() {
     this.lines = {}
 
-    this.add.image(this.width / 2, this.height / 2, 'bg')
-
-    this.add.rectangle(this.centerSlotX, this.topContainerHeight / 2, outerWidth, this.topContainerHeight, slotConfig.neonGreenColor)
+    this.add.image(this.width / 2, this.height / 2, 'bg')    
 
     // frame variables
     const yOffset = (slotConfig.reelsLength * slotConfig.symbolSize) / 2 + slotConfig.frameWidth / 2
@@ -178,9 +176,14 @@ export default class MainScene extends Scene {
       this.topContainerHeight / 2 - slotConfig.frameWidth / 2
     )
 
+    if (this.isMobilePortrait) {
+      this.topContainer.add(
+        this.add.rectangle(0, 0, this.outerWidth, this.topContainerHeight + slotConfig.frameWidth, slotConfig.violetColor)
+      )
+    }
     this.topContainer.add(
       this.add
-        .text(-this.outerWidth / 2, 5, 'FRUITS', {
+        .text(-this.outerWidth / 2 + 5, 5, 'FRUITS', {
           color: convertColorToString(slotConfig.neonYellowColor),
           fontSize: '65px',
           fontFamily: 'PlaypenSansDevaBold'
@@ -190,7 +193,7 @@ export default class MainScene extends Scene {
 
     this.topContainer.add(
       this.add
-        .text(this.outerWidth / 2, -10, 'BALANCE', {
+        .text(this.outerWidth / 2 - 10, -10, 'BALANCE', {
           color: convertColorToString(slotConfig.whiteColor),
           fontSize: '26px',
           fontFamily: 'PlaypenSansDevaBold'
@@ -860,7 +863,7 @@ export default class MainScene extends Scene {
 
   getBetValue(): GameObjects.Text {
     return this.add
-      .text(-slotConfig.spinButtonSize / 1.5, 0, this.calculateBet().toString(), {
+      .text(-slotConfig.spinButtonSize / 1.65, 0, this.calculateBet().toString(), {
         color: convertColorToString(slotConfig.neonYellowColor),
         fontSize: '40px',
         fontFamily: 'PlaypenSansDevaBold'
@@ -907,7 +910,7 @@ export default class MainScene extends Scene {
 
   getBalanceValue(): GameObjects.Text {
     return this.add
-      .text(this.outerWidth / 2, 20, `${numberWithCommas(this.balance)} $`, {
+      .text(this.outerWidth / 2 - 10, 20, `${numberWithCommas(this.balance)} $`, {
         color: convertColorToString(slotConfig.whiteColor),
         fontSize: '26px',
         fontFamily: 'PlaypenSansDevaBold'
