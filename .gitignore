@@ -4,3 +4,4 @@
 /.firebase
 firebase.json
 .firebaserc
+/rollup/node_modules

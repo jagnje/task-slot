@@ -1027,7 +1027,7 @@ export default class MainScene extends Scene {
                           duration: slotConfig.textTweenDuration,
                           yoyo: true,
                           onUpdate: tween => {
-                            this.winValue.setFontSize(30 + tween.getValue() * 80)
+                            this.winValue.setFontSize(30 + (tween.getValue() || 0) * 80)
                           },
                           repeat: 1
                         }),
@@ -1040,7 +1040,7 @@ export default class MainScene extends Scene {
                     duration: slotConfig.textTweenDuration,
                     yoyo: true,
                     onUpdate: tween => {
-                      this.message.setFontSize(40 + tween.getValue() * 80)
+                      this.message.setFontSize(40 + (tween.getValue() || 0) * 80)
                     },
                     onComplete: () => {
                       this.isSpinning = false

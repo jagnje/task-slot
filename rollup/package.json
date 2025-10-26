@@ -1,0 +1,22 @@
+{
+  "name": "phaser4-rollup-ts",
+  "version": "1.0.0",
+  "description": "Phaser 4 + TypeScript + Rollup starter project",
+  "scripts": {
+    "dev": "rollup -c -w",
+    "build": "rollup -c"
+  },
+  "dependencies": {
+    "phaser": "4.0.0-rc.5"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "28.0.9",
+    "@rollup/plugin-node-resolve": "16.0.3",
+    "@rollup/plugin-typescript": "12.3.0",
+    "rollup": "4.52.5",
+    "rollup-plugin-serve": "3.0.0",
+    "rollup-plugin-livereload": "2.0.5",
+    "typescript": "5.9.3"
+  },
+  "type": "module"
+}
