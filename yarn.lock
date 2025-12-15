@@ -3369,10 +3369,10 @@ jake@^10.8.5:
     filelist "^1.0.4"
     picocolors "^1.1.1"
 
-javascript-obfuscator@5.0.1:
-  version "5.0.1"
-  resolved "https://registry.yarnpkg.com/javascript-obfuscator/-/javascript-obfuscator-5.0.1.tgz#acf61fb82b695bd467fc23cccf3f80f9fb28f144"
-  integrity sha512-x7EId6zLv5in+4MavFzOSY8KX7obmayNP1OEv47BiX6NDRm6vZvFJJAWW9N7ZkVS7BKoadO7nn5GjVG3bUZ9xQ==
+javascript-obfuscator@5.1.0:
+  version "5.1.0"
+  resolved "https://registry.yarnpkg.com/javascript-obfuscator/-/javascript-obfuscator-5.1.0.tgz#c529bc74d46f223ad45c19be9e6414bbaced05d9"
+  integrity sha512-yw0zSxH20YVxJ7Jg23ii9eojcsGkfZmP6AEvaddv026+3H3QPOd/qPo168+80gvzN6pyMQDCbLwxjrP76jkPAg==
   dependencies:
     "@javascript-obfuscator/escodegen" "2.3.1"
     "@javascript-obfuscator/estraverse" "5.4.0"
